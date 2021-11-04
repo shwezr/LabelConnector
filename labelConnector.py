@@ -290,19 +290,22 @@ def runLabelMatch(forceShowUi=False):
     labelConnectorNodeCreated = False
     nodes = nuke.selectedNodes()
     dots = getAllDots()
-    for node in nodes:
-        if node["label"].value():
 
-            if not node.name().startswith("Connector"):
-                for dot in dots:
-                    if node["label"].value() == dot["label"].value():
-                        if not connectNodeToDot(node, dot):
+    if not forceShowUi:
+        for node in nodes:
+            if node["label"].value():
+                if not node.name().startswith("Connector"):
+                    for dot in dots:
+                        if node["label"].value() == dot["label"].value():
+                            if connectNodeToDot(node, dot):
+                                uiCheck = False
+                            else:
+                                uiCheck = True
+                            break
+                        else:
                             uiCheck = True
-                    else:
-                        uiCheck = True
-
-        else:
-            uiCheck = True
+            else:
+                uiCheck = True
 
     global labelConnectorUi  # pylint: disable=global-statement
 
