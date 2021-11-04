@@ -311,6 +311,8 @@ def runLabelMatch(forceShowUi=False):
 
     # if the label is empty or not match could be found and the selection is just one node
     if (uiCheck or forceShowUi) and len(nodes) == 1 and dots:
+        if forceShowUi:
+            node = nodes[0]
         labelConnectorUi = labelConnector(node, dots)
         labelConnectorUi.show()
 
