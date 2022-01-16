@@ -1,15 +1,21 @@
 # LabelConnector
-Connect Nodes via label-matching. Super light-weight without callbacks.
+A Connector Tool for Nuke. Connect Nodes via label-matching. Super light-weight without callbacks. Uses simple ConnectorDots (Dot nodes named "Connector...") and node labels plus a handy UI to connect new nodes from anywhere in the DAG.
 
 ## Quick Manual
 
-**F9** - created new Connector Dot using a selected Dot (or any other node, then it creates new Dot). Alternatively, it will rename an existing selected Connector Dot alongside all dependend Nodes.
+**F9:** 
+- **no ConnectorDot selected:** Creates new ConnectorDot
+- **ConnectorDot selected:** Renames ConnectorDot alongside all dependent Nodes.
 
-**F8** - connects all label matches when mutliple nodes selected, not showing the Connector UI. Alternatively creates new connection with single empty labeled node selected, showing the Connector UI. With no selection, it will create a new PostageStamp/NoOp showing the Connector UI.
+**F8:** 
+- **\>= 1 selected nodes:**  Connects all label matches. No ConnectorUI is shown.
+- **1 selected node, no label:** Shows ConnectorUI.
+- **0 selected nodes:** Will create a new PostageStamp/NoOp, showing the ConnectorUI.
  
-**ctrl+F8** - when a single alrady labeled node is selected, this will force to make a new connection instead of connecting the existing label match.
+**ctrl+F8:** 
+- **1 selected node, any label:** Will show the ConnectorUI instead of connecting the existing label match.
 
-Feel free to color your Connector Dots, these colors will then appear in the Connector UI.
+Feel free to color your ConnectorDots, these colors will then appear in the ConnectorUI.
 
 ## Example
 
