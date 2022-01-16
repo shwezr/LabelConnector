@@ -17,6 +17,8 @@ A Connector Tool for Nuke. Connect Nodes via label-matching. Super light-weight 
 
 Feel free to color your ConnectorDots, these colors will then appear in the ConnectorUI.
 
+Thanks to Falk Hofmann for helping with the UI and code clean up.
+
 ## Example
 
 Select any node you want to attach a Connector Dot to, press **F9**.
