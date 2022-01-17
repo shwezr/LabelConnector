@@ -1,4 +1,4 @@
-# labelConnector v0.17
+# labelConnector v1.0
 # Lukas Schwabe & Johannes Hezer
 # UI based on ChannelHotbox - Falk Hofmann
 
