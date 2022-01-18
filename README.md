@@ -34,7 +34,7 @@ You can also colorize the Connector Dot - I use the super handy W_HotBox for thi
 
 \
 \
-Click free DAG space, or any Node you want, and hit **F8** to set a new connection.
+Click free DAG space, or any Node you want, and hit **A** to set a new connection.
 
 ![Create Connection 01](./.pictures/LabelConnectorConnection01.png)
 
