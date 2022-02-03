@@ -1,4 +1,4 @@
-# labelConnector v1.1
+# labelConnector v1.2
 # Lukas Schwabe & Johannes Hezer
 # UI based on ChannelHotbox - Falk Hofmann
 
@@ -23,52 +23,55 @@ UNDO = nuke.Undo()
 UNDO_EVENT_TEXT = "Label Connector"
 
 # Node classes for NoOps instead of PostageStamps
-threeD_deep_nodes = ["DeepColorCorrect",
-                     "DeepColorCorrect2",
-                     "DeepCrop",
-                     "DeepExpression",
-                     "DeepFromFrames",
-                     "DeepFromImage",
-                     "DeepMerge",
-                     "DeepRead",
-                     "DeepRecolor",
-                     "DeepReformat",
-                     "DeepTransform",
-                     "DeepWrite",
-                     "ApplyMaterial"
-                     "Axis2",
-                     "Axis3",
-                     "Card2",
-                     "Camera",
-                     "Camera2",
-                     "Camera3",
-                     "Cube",
-                     "Cylinder",
-                     "EditGeo",
-                     "DisplaceGeo",
-                     "Light",
-                     "Light2",
-                     "Light3",
-                     "DirectLight",
-                     "Spotlight",
-                     "Environment",
-                     "MergeGeo",
-                     "Normals",
-                     "Project3D",
-                     "Project3D2",
-                     "ReadGeo",
-                     "Scene",
-                     "Sphere",
-                     "TransformGeo",
-                     "WriteGeo"]
+threeDDeepNodes = ["DeepColorCorrect",
+                   "DeepColorCorrect2",
+                   "DeepCrop",
+                   "DeepExpression",
+                   "DeepFromFrames",
+                   "DeepFromImage",
+                   "DeepMerge",
+                   "DeepRead",
+                   "DeepRecolor",
+                   "DeepReformat",
+                   "DeepTransform",
+                   "DeepWrite",
+                   "ApplyMaterial"
+                   "Axis2",
+                   "Axis3",
+                   "Card2",
+                   "Camera",
+                   "Camera2",
+                   "Camera3",
+                   "Cube",
+                   "Cylinder",
+                   "EditGeo",
+                   "DisplaceGeo",
+                   "Light",
+                   "Light2",
+                   "Light3",
+                   "DirectLight",
+                   "Spotlight",
+                   "Environment",
+                   "MergeGeo",
+                   "Normals",
+                   "Project3D",
+                   "Project3D2",
+                   "ReadGeo",
+                   "Scene",
+                   "Sphere",
+                   "TransformGeo",
+                   "WriteGeo"]
 
 # ignore these classes to determine 2D or 3D tree
-ignore_nodes = ["Dot",
-                "NoOp",
-                "TimeOffset",
-                "TimeWarp",
-                "Retime",
-                "FrameHold"]
+skipNodes = ["Dot",
+             "NoOp",
+             "TimeOffset",
+             "TimeWarp",
+             "Retime",
+             "FrameHold"]
+
+neverConnectNodes = ['BackdropNode', 'Read', 'DeepRead', 'ReadGeo', 'AudioRead',
+                     'Constant', 'CheckerBoard', 'ColorBars', 'ColorWheel', 'Viewer']
 
 
 class ConnectorButton(QtGuiWidgets.QPushButton):
@@ -230,9 +233,9 @@ def isPreviousNodeDeepOrThreeD(node):
     if dependencies:
         previousNode = dependencies[0]
 
-        if previousNode.Class() in ignore_nodes:
+        if previousNode.Class() in skipNodes:
             return isPreviousNodeDeepOrThreeD(previousNode)
-        elif previousNode.Class() in threeD_deep_nodes:
+        elif previousNode.Class() in threeDDeepNodes:
             return True
 
     return False
@@ -335,18 +338,19 @@ def runLabelMatch(forceShowUi=False):
 
     if not forceShowUi:
         for node in nodes:
-            if node["label"].value():  # only none labeled nodes show the UI
-                if not node.name().startswith(CONNECTOR_KEY):
-                    for dot in connectorDots:
-                        if node["label"].value() == dot["label"].value():
-                            # Label Match has been found, try to connect the two Nodes
-                            uiCheck = False if connectNodeToDot(
-                                node, dot) else True
-                            break
-                        else:
-                            uiCheck = True
-            else:
-                uiCheck = True
+            if node.Class() not in neverConnectNodes:
+                if node["label"].value():  # only none labeled nodes show the UI
+                    if not node.name().startswith(CONNECTOR_KEY):
+                        for dot in connectorDots:
+                            if node["label"].value() == dot["label"].value():
+                                # Label Match has been found, try to connect the two Nodes
+                                uiCheck = False if connectNodeToDot(
+                                    node, dot) else True
+                                break
+                            else:
+                                uiCheck = True
+                else:
+                    uiCheck = True
 
     if len(nodes) > 1:
         # with more than one node, no new connections will be made, no UI shown.
