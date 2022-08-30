@@ -1,4 +1,4 @@
-# labelConnector v1.2
+# labelConnector v1.3
 # Lukas Schwabe & Johannes Hezer
 # UI based on ChannelHotbox - Falk Hofmann
 
@@ -19,56 +19,10 @@ BUTTON_HIGHLIGHT_COLOR = 3261606143
 CONNECTOR_KEY = "Connector"
 CONNECTED_KEY = "Connected"
 
+USE_POSTAGESTAMPS = True  # set to False to use NoOps only
+
 UNDO = nuke.Undo()
 UNDO_EVENT_TEXT = "Label Connector"
-
-# Node classes for NoOps instead of PostageStamps
-threeDDeepNodes = ["DeepColorCorrect",
-                   "DeepColorCorrect2",
-                   "DeepCrop",
-                   "DeepExpression",
-                   "DeepFromFrames",
-                   "DeepFromImage",
-                   "DeepMerge",
-                   "DeepRead",
-                   "DeepRecolor",
-                   "DeepReformat",
-                   "DeepTransform",
-                   "DeepWrite",
-                   "ApplyMaterial"
-                   "Axis2",
-                   "Axis3",
-                   "Card2",
-                   "Camera",
-                   "Camera2",
-                   "Camera3",
-                   "Cube",
-                   "Cylinder",
-                   "EditGeo",
-                   "DisplaceGeo",
-                   "Light",
-                   "Light2",
-                   "Light3",
-                   "DirectLight",
-                   "Spotlight",
-                   "Environment",
-                   "MergeGeo",
-                   "Normals",
-                   "Project3D",
-                   "Project3D2",
-                   "ReadGeo",
-                   "Scene",
-                   "Sphere",
-                   "TransformGeo",
-                   "WriteGeo"]
-
-# ignore these classes to determine 2D or 3D tree
-skipNodes = ["Dot",
-             "NoOp",
-             "TimeOffset",
-             "TimeWarp",
-             "Retime",
-             "FrameHold"]
 
 neverConnectNodes = ['BackdropNode', 'Read', 'DeepRead', 'ReadGeo', 'AudioRead',
                      'Constant', 'CheckerBoard', 'ColorBars', 'ColorWheel', 'Viewer']
@@ -185,9 +139,9 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
         # create destination Node if none exists yet
         if not self.node:
-            self.node = createConnectingNode(self.sender().dot)
-
-        connectNodeToDot(self.node, self.sender().dot)
+            self.node = createConnectingNodeAndConnect(self.sender().dot)
+        else:
+            connectNodeToDot(self.node, self.sender().dot)
 
         UNDO.end()
         self.close()
@@ -200,9 +154,9 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
                 # create destination Node if none exists yet
                 if not self.node:
-                    self.node = createConnectingNode(dot)
-
-                connectNodeToDot(self.node, dot)
+                    createConnectingNodeAndConnect(dot)
+                else:
+                    connectNodeToDot(self.node, dot)
 
                 UNDO.end()
                 self.close()
@@ -217,31 +171,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
         return False
 
 
-def isPreviousNodeDeepOrThreeD(node):
-    """
-    checks if the upstream Node is a 3D/deep or 3D type of node
-
-    Args:
-        node (node): Any nuke Node
-
-    Returns:
-        bool: True if the upstream node is 3D or Deep type
-    """
-
-    dependencies = node.dependencies(nuke.INPUTS | nuke.HIDDEN_INPUTS)
-
-    if dependencies:
-        previousNode = dependencies[0]
-
-        if previousNode.Class() in skipNodes:
-            return isPreviousNodeDeepOrThreeD(previousNode)
-        elif previousNode.Class() in threeDDeepNodes:
-            return True
-
-    return False
-
-
-def createConnectingNode(dot):
+def createConnectingNodeAndConnect(dot):
     """
     Creates a to-be-connected Node based on 2D or 3D/Deep type node tree
 
@@ -252,16 +182,20 @@ def createConnectingNode(dot):
         node: New Node to be connected
     """
 
-    nodeType = "PostageStamp"
-    if isPreviousNodeDeepOrThreeD(dot):
-        nodeType = "NoOp"
+    nodeClass = "PostageStamp"
 
-    node = nuke.createNode(nodeType, inpanel=False)
+    if not USE_POSTAGESTAMPS:
+        nodeClass = "NoOp"
+
+    node = nuke.createNode(nodeClass, inpanel=False)
+
+    if not connectNodeToDot(node, dot) and USE_POSTAGESTAMPS:
+        nuke.delete(node)
+        node = nuke.createNode("NoOp", inpanel=False)
+        connectNodeToDot(node, dot)
 
     node.knob('tile_color').setValue(rgb2interface((80, 80, 80)))
     node.setName(CONNECTED_KEY)
-
-    return node
 
 
 def connectNodeToDot(node, dot):
