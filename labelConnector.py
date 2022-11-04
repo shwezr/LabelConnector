@@ -2,14 +2,14 @@
 # Lukas Schwabe & Johannes Hezer
 # UI based on ChannelHotbox - Falk Hofmann
 
-import logging
-import math
-from enum import Enum
 
 import nuke
 import PySide2.QtCore as QtCore
 import PySide2.QtGui as QtGui
 import PySide2.QtWidgets as QtGuiWidgets
+import logging
+import math
+from enum import Enum
 
 LOGGER = logging.getLogger("labelMatcher")
 
@@ -41,16 +41,19 @@ COLORLIST = {
     'Dark Blue': 320482047,
     'Purple': 975388415,
     'Default': BUTTON_REGULAR_COLOR
-
 }
+
+# you can add more Classes, that you don't want to connect. 
+# Classes with no Inputs like Reads, Backdrops,... will already be ignored
+IGNORECLASSES = ["Viewer"]
 
 
 class UIType(Enum):
-    default = 1
-    connectorSelectedOnly = 2
-    childrenSelectedOnly = 3
-    showColorMenu = 4
-    nameConnectorDot = 5
+    UI_DEFAULT = 1
+    UI_CONNECTORONLY = 2
+    UI_CHILDRENONLY = 3
+    UI_COLOR = 4
+    UI_NAMING = 5
 
 
 class ConnectorButton(QtGuiWidgets.QPushButton):
@@ -68,15 +71,15 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
                            QtGuiWidgets.QSizePolicy.Expanding)
         self.color = rgb2hex(interface2rgb(getTileColor(dot)))
         self.highlight = rgb2hex(interface2rgb(BUTTON_HIGHLIGHT_COLOR))
-        self.setStyleSheet("background-color:"+self.color + ";" + BUTTON)
+        self.setStyleSheet("background-color:" + self.color + ";" + BUTTON)
 
     def enterEvent(self, event):
         """Change color to orange when mouse enters button."""
-        self.setStyleSheet("background-color:"+self.highlight + ";" + BUTTON)
+        self.setStyleSheet("background-color:" + self.highlight + ";" + BUTTON)
 
     def leaveEvent(self, event):
         """Change color to grey when mouse leaves button."""
-        self.setStyleSheet("background-color:"+self.color + ";" + BUTTON)
+        self.setStyleSheet("background-color:" + self.color + ";" + BUTTON)
 
 
 class StandardButton(QtGuiWidgets.QPushButton):
@@ -153,7 +156,7 @@ class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
     def keyPressEvent(self, event):
         """bounce back event to main ui to catch and overwrite TAB behaviour"""
 
-        super().keyPressEvent(event)
+        super(LineEditConnectSelection, self).keyPressEvent(event)
         self.parent().keyPressEvent(event)
 
 
@@ -171,7 +174,7 @@ class LineEditNaming(QtGuiWidgets.QLineEdit):
 class LabelConnector(QtGuiWidgets.QWidget):
     """User Interface class to provide buttons for each found ConnectorDot."""
 
-    def __init__(self, node=None, dots=None, selectedConnectors=None, uitype: UIType = UIType.default):
+    def __init__(self, node=None, dots=None, selectedConnectors=None, uitype=UIType.UI_DEFAULT):
 
         self.node = node
         self.selectedConnectors = selectedConnectors
@@ -189,7 +192,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
         column_counter, row_counter = 0, 0
         self.hasInputField = False
 
-        if uitype == UIType.childrenSelectedOnly:
+        if uitype == UIType.UI_CHILDRENONLY:
             width, height = 300, 100
 
             button = StandardButton(self, "Jump to Parent")
@@ -202,7 +205,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
             button.clicked.connect(self.forceConnect)
             grid.addWidget(button, row_counter, column_counter)
 
-        elif uitype == UIType.connectorSelectedOnly:
+        elif uitype == UIType.UI_CONNECTORONLY:
 
             if len(selectedConnectors) == 1:
                 width, height = 450, 100
@@ -226,7 +229,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
             button.clicked.connect(self.selectColor)
             grid.addWidget(button, row_counter, column_counter)
 
-        elif uitype == UIType.showColorMenu:
+        elif uitype == UIType.UI_COLOR:
 
             length = math.ceil(len(COLORLIST) / 2)
             width, height = length * 150, 150
@@ -245,7 +248,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
             self.hasInputField = False
 
-        elif uitype == UIType.nameConnectorDot:
+        elif uitype == UIType.UI_NAMING:
             self.input = LineEditNaming(self)
 
             self.textOld = ""
@@ -377,7 +380,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
     def setupConnector(self):
         self.close()
-        showNamingUi(self.node)
+        showNamingUI(self.node)
 
     def selectColor(self):
         self.close()
@@ -397,7 +400,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
         if not self.hasInputField:
             return
 
-        if self.uiType == UIType.nameConnectorDot:
+        if self.uiType == UIType.UI_NAMING:
             if self.input.text():
                 makeConnector(self.node, self.input.text(), self.textOld)
 
@@ -429,7 +432,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
         return False
 
-    def focusNextPrevChild(self, next: bool) -> bool:
+    def focusNextPrevChild(self, next):
         """override, to be able to use TAB as ENTER, like the Nuke Node Menu"""
         return False
 
@@ -477,7 +480,7 @@ def connectNodeToDot(node, dot):
     """
 
     if not isConnectingNode(node):
-        if not hasInputPossible(node):
+        if not hasPossibleInputs(node):
             return True
 
         UNDO.begin(UNDO_EVENT_TEXT)
@@ -486,7 +489,11 @@ def connectNodeToDot(node, dot):
 
         if node.setInput(0, connectingNode):
             connectingNode.setXpos(node.xpos())
-            connectingNode.setYpos(node.ypos() - 100)
+            if connectingNode.Class() == "NoOp":
+                offset = 50
+            else:
+                offset = 100
+            connectingNode.setYpos(node.ypos() - offset)
 
             UNDO.end()
             return True
@@ -599,27 +606,28 @@ def showColorSelectionUI(selectedConnectors):
     global LABELCONNECTORUI
 
     LABELCONNECTORUI = LabelConnector(selectedConnectors[0],
-                                      selectedConnectors=selectedConnectors, uitype=UIType.showColorMenu)
+                                      selectedConnectors=selectedConnectors, uitype=UIType.UI_COLOR)
     LABELCONNECTORUI.show()
 
 
-def showNamingUi(node):
+def showNamingUI(node):
     """
     force to show UI with color options
     """
 
     global LABELCONNECTORUI
 
-    LABELCONNECTORUI = LabelConnector(node, uitype=UIType.nameConnectorDot)
+    LABELCONNECTORUI = LabelConnector(node, uitype=UIType.UI_NAMING)
     LABELCONNECTORUI.show()
 
 
-def hasInputPossible(node):
+def hasPossibleInputs(node):
     """
     workaround to find out if a node can have connections. Because the "inputs" are still there
     and could be forcefully connected to sth.
+    Also ignore IGNORECLASSES.
     """
-    return "hide_input" in node.knobs() or node.Class() == "Viewer"
+    return "hide_input" in node.knobs() and not node.Class() in IGNORECLASSES
 
 
 def setConnectorDot(dot, txt):
@@ -754,8 +762,7 @@ def hex2rgb(hexColor):
 
 def labelConnector(useNoOpNodesOnly=True):
     """
-    Entry function, determines if there are multiple nodes that shall be connected via label matching,
-    or rather a single none-labeled or no node is selected so a new connection can be set up.
+    Entry function. Determines, which UI to open.
     """
 
     if useNoOpNodesOnly:
@@ -788,19 +795,19 @@ def labelConnector(useNoOpNodesOnly=True):
 
         node = nodes[0]
 
-        if not hasInputPossible(node):
+        if not hasPossibleInputs(node):
             # clear list, so no possible connections are shown, as there are none possible
             connectorDots = []
 
         if isConnectedCorrectly(node):
             LABELCONNECTORUI = LabelConnector(
-                node, connectorDots, uitype=UIType.childrenSelectedOnly)
+                node, connectorDots, uitype=UIType.UI_CHILDRENONLY)
             LABELCONNECTORUI.show()
             return
 
         if onlyConnectorDotsSelected:
             LABELCONNECTORUI = LabelConnector(node,
-                                              selectedConnectors=nodes, uitype=UIType.connectorSelectedOnly)
+                                              selectedConnectors=nodes, uitype=UIType.UI_CONNECTORONLY)
             LABELCONNECTORUI.show()
             return
 
