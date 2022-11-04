@@ -15,6 +15,8 @@ A Connector Tool for Nuke. Connect Nodes via label-matching. Super light-weight 
 **alt+A:** 
 - **1 selected node, any label:** Will show the ConnectorUI instead of connecting the existing label match.
 
+You can change these Shortcuts in the attached menu.py.
+
 Feel free to color your ConnectorDots, these colors will then appear in the ConnectorUI.
 
 Thanks to Falk Hofmann for helping with the UI and code clean up.

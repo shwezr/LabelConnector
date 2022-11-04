@@ -1,20 +1,26 @@
-# labelConnector v1.3
+# labelConnector v1.4
 # Lukas Schwabe & Johannes Hezer
 # UI based on ChannelHotbox - Falk Hofmann
 
 import logging
 import math
+from enum import Enum
 
 import nuke
 import PySide2.QtCore as QtCore
 import PySide2.QtGui as QtGui
 import PySide2.QtWidgets as QtGuiWidgets
 
-LOG = logging.getLogger("labelMatcher")
+logger = logging.getLogger("labelMatcher")
+logger.setLevel(10)
 
 BUTTON = "border-radius: 8px; font: 13px;"
 BUTTON_REGULAR_COLOR = 673720575
+BUTTON_REGULARDARK_COLOR = 471802623
 BUTTON_HIGHLIGHT_COLOR = 3261606143
+
+SEARCHFIELD = "border-radius: 8px; font: 13px; border: 1px solid #212121;"
+RENAMEFIELD = "border-radius: 3px; font: 13px; border: 1px solid #212121;"
 
 CONNECTOR_KEY = "Connector"
 CONNECTED_KEY = "Connected"
@@ -24,21 +30,39 @@ USE_POSTAGESTAMPS = True  # set to False to use NoOps only
 UNDO = nuke.Undo()
 UNDO_EVENT_TEXT = "Label Connector"
 
-neverConnectNodes = ['BackdropNode', 'Read', 'DeepRead', 'ReadGeo', 'AudioRead',
-                     'Constant', 'CheckerBoard', 'ColorBars', 'ColorWheel', 'Viewer']
+COLORLIST = {
+    'Red': 1277436927,
+    'Orange': 2202599679,
+    'Yellow': 2154504703,
+    'Green': 793519103,
+    'Dark Green': 304619007,
+    'Cyan': 592071935,
+    'Blue': 556482559,
+    'Dark Blue': 320482047,
+    'Purple': 975388415,
+    'Default': nuke.defaultNodeColor('Dot')
+
+}
+
+
+class UIType(Enum):
+    default = 1
+    connectorSelectedOnly = 2
+    childrenSelectedOnly = 3
+    showColorMenu = 4
 
 
 class ConnectorButton(QtGuiWidgets.QPushButton):
     """Custom QPushButton to change colors when hovering above."""
 
-    def __init__(self, dot, node, button_width, parent=None):
+    def __init__(self, parent, dot, node):
         super(ConnectorButton, self).__init__(parent)
         self.setMouseTracking(True)
         self.setText(dot.knob('label').getValue())
         self.dot = dot
         self.node = node
 
-        self.setMinimumWidth(button_width / 2)
+        self.setMinimumWidth(100)
         self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
                            QtGuiWidgets.QSizePolicy.Expanding)
         self.color = rgb2hex(interface2rgb(getTileColor(dot)))
@@ -54,19 +78,65 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
         self.setStyleSheet("background-color:"+self.color + ";" + BUTTON)
 
 
+class StandardButton(QtGuiWidgets.QPushButton):
+    """Custom QPushButton to change colors when hovering above."""
+
+    def __init__(self, parent, text, color=BUTTON_REGULAR_COLOR):
+        super(StandardButton, self).__init__(parent)
+        self.setMouseTracking(True)
+        self.setText(text)
+
+        self.setMinimumWidth(100)
+
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
+                           QtGuiWidgets.QSizePolicy.Expanding)
+
+        self.interfaceColor = color
+
+        self.color = rgb2hex(interface2rgb(color))
+        self.highlight = rgb2hex(interface2rgb(BUTTON_HIGHLIGHT_COLOR))
+        self.setStyleSheet("background-color:"+self.color + ";"
+                           + BUTTON
+                           #    + "font-style: italic;"
+                           )
+
+    def enterEvent(self, event):
+        """Change color to orange when mouse enters button."""
+        self.setStyleSheet("background-color:"+self.highlight + ";"
+                           + BUTTON
+                           #    + "font-style: italic;"
+                           )
+
+    def leaveEvent(self, event):
+        """Change color to  grey when mouse leaves button."""
+        self.setStyleSheet("background-color:"+self.color + ";"
+                           + BUTTON
+                           #    + "font-style: italic;"
+                           )
+
+# for later use, to overwrite autocompletion, nuke style,maybe
+class Completer(QtGuiWidgets.QCompleter):
+    """Custom QLineEdit with combined auto completion."""
+
+    def __init__(self, dot_list, parent):
+        super(Completer, self).__init__(dot_list, parent)
+        
+
 class LineEdit(QtGuiWidgets.QLineEdit):
     """Custom QLineEdit with combined auto completion."""
 
     def __init__(self, parent, dots, node):
         super(LineEdit, self).__init__(parent)
-        self.parent = parent
+        # self.parent = parent
         self.node = node
         self.dots = dots
-        self.setStyleSheet(BUTTON)
+        self.setStyleSheet(SEARCHFIELD)
 
         dot_list = []
         for dot in dots:
             dot_list.append(dot.knob('label').getValue())
+
+        self.setMinimumWidth(100)
 
         self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
                            QtGuiWidgets.QSizePolicy.Expanding)
@@ -74,50 +144,227 @@ class LineEdit(QtGuiWidgets.QLineEdit):
         self.completer = QtGuiWidgets.QCompleter(dot_list, self)
         self.completer.setCaseSensitivity(
             QtCore.Qt.CaseSensitivity.CaseInsensitive)
+        self.completer.setFilterMode(QtCore.Qt.MatchFlag.MatchContains)
+        
+
         self.setCompleter(self.completer)
-        self.completer.activated.connect(self.returnPressed)
+    
+    def keyPressEvent(self, event):
+        super().keyPressEvent(event)
+        self.parent().keyPressEvent(event)
+        
+        
+
+
+class LineEditRename(QtGuiWidgets.QLineEdit):
+    """Custom QLineEdit with combined auto completion."""
+
+    def __init__(self, parent):
+        super(LineEditRename, self).__init__(parent)
+        self.parent = parent
+        self.setStyleSheet(RENAMEFIELD)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
+                           QtGuiWidgets.QSizePolicy.Expanding)
+        
+
+
+
+class NameConnector(QtGuiWidgets.QWidget):
+    def __init__(self, node):
+        super(NameConnector, self).__init__()
+
+        self.input = LineEditRename(self)
+
+        self.node = node
+        self.textOld = ""
+        if self.node:
+            self.textOld = node.knob('label').getValue()
+            self.input.setText(self.textOld)
+            self.input.selectAll()
+
+        box = QtGuiWidgets.QVBoxLayout()
+        self.setLayout(box)
+        width, height = 200, 75
+        self.setFixedHeight(height)
+        self.setMinimumWidth(width)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding,
+                           QtGuiWidgets.QSizePolicy.Preferred)
+
+        box.addWidget(self.input)
+
+        self.input.returnPressed.connect(self.lineEnter)
+
+        self.setWindowFlags(QtCore.Qt.FramelessWindowHint |
+                            QtCore.Qt.WindowStaysOnTopHint)
+
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        self.setAttribute(QtCore.Qt.WA_NoSystemBackground)
+
+        self.installEventFilter(self)
+        self.input.setFocus()
+
+        offset = QtCore.QPoint(width/2, height / 2)
+        self.move(QtGui.QCursor.pos() - offset)
+
+    def eventFilter(self, object, event):
+        if event.type() in [QtCore.QEvent.WindowDeactivate, QtCore.QEvent.FocusOut]:
+            self.close()
+            return True
+        return False
+
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Escape:
+            self.close()
+        if event.key() == QtCore.Qt.Key_Tab:
+            self.lineEnter()
+
+    def lineEnter(self):
+
+        if self.input.text():
+            makeConnector(self.node, self.input.text(), self.textOld)
+
+        self.close()
+
+    # override, to be able to use TAB as ENTER, like the Nuke Node Menu
+    def focusNextPrevChild(self, next: bool) -> bool:
+        return False
 
 
 class LabelConnector(QtGuiWidgets.QWidget):
     """User Interface class to provide buttons for each found ConnectorDot."""
 
-    def __init__(self, node, dots):
+    def __init__(self, node=None, dots=None, selectedConnectors=None, uitype: UIType = UIType.default):
 
         self.node = node
+        self.selectedConnectors = selectedConnectors
+        self.dots = dots
 
         super(LabelConnector, self).__init__()
 
-        length = math.ceil(math.sqrt(len(dots) + 1))
-        width, height = length * 200, length * 50
-        self.setFixedSize(width, height)
-        offset = QtCore.QPoint(width * 0.5, height * 0.5)
-        self.move(QtGui.QCursor.pos() - offset)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
+                           QtGuiWidgets.QSizePolicy.Expanding)
 
         grid = QtGuiWidgets.QGridLayout()
         self.setLayout(grid)
 
         column_counter, row_counter = 0, 0
-        button_width = width / length
 
-        for dot in dots:
-            button = ConnectorButton(dot, node, button_width)
-            button.clicked.connect(self.clicked)
+        width, height = 0, 0
+
+        if uitype == UIType.childrenSelectedOnly:
+            width, height = 300, 100
+
+            button = StandardButton(self, "Jump to parent")
+            button.clicked.connect(self.clickedJump)
             grid.addWidget(button, row_counter, column_counter)
 
-            if column_counter > length:
-                row_counter += 1
-                column_counter = 0
+            column_counter += 1
 
-            else:
+            button = StandardButton(self, "Re-Connect to...")
+            button.clicked.connect(self.forceConnect)
+            grid.addWidget(button, row_counter, column_counter)
+
+            self.set_window_properties(noFocus=True)
+
+        elif uitype == UIType.connectorSelectedOnly:
+
+            if len(selectedConnectors) == 1:
+                width, height = 450, 100
+
+                button = StandardButton(self, "Rename...")
+                button.clicked.connect(self.setupConnector)
+                grid.addWidget(button, row_counter, column_counter)
+
                 column_counter += 1
 
-        self.input = LineEdit(self, dots, node)
-        grid.addWidget(self.input, row_counter, column_counter)
-        self.input.returnPressed.connect(self.lineEnter)
+            else:
+                width, height = 300, 100
 
-        self.set_window_properties()
+            button = StandardButton(self, "select all children")
+            button.clicked.connect(self.selectChildren)
+            grid.addWidget(button, row_counter, column_counter)
 
-    def set_window_properties(self):
+            column_counter += 1
+
+            button = StandardButton(self, "Colorize...")
+            button.clicked.connect(self.selectColor)
+            grid.addWidget(button, row_counter, column_counter)
+
+            self.set_window_properties(noFocus=True)
+
+        elif uitype == UIType.showColorMenu:
+
+            length = math.ceil(len(COLORLIST) / 2)
+            width, height = length * 150, 150
+
+            for color in COLORLIST:
+                button = StandardButton(self, color, COLORLIST[color])
+                button.clicked.connect(self.setColor)
+                grid.addWidget(button, row_counter, column_counter)
+
+                if column_counter + 1 >= length:
+                    row_counter += 1
+                    column_counter = 0
+
+                else:
+                    column_counter += 1
+
+            self.set_window_properties(noFocus=True)
+
+        else:
+
+            lenGrid = len(dots) + 1
+
+            if dots:
+                lenGrid += 1
+
+            length = math.ceil(math.sqrt(lenGrid))
+            width, height = length * 150, length * 50
+
+            for dot in dots:
+                button = ConnectorButton(self, dot, node)
+                button.clicked.connect(self.clicked)
+                grid.addWidget(button, row_counter, column_counter)
+
+                if column_counter > length:
+                    row_counter += 1
+                    column_counter = 0
+
+                else:
+                    column_counter += 1
+
+            if dots:
+
+                self.input = LineEdit(self, dots, node)
+                grid.addWidget(self.input, row_counter, column_counter)
+                self.input.returnPressed.connect(self.lineEnter)
+                self.input.completer.popup().clicked.connect(self.lineEnter)
+                
+
+                if column_counter > length:
+                    row_counter += 1
+                    column_counter = 0
+
+                else:
+                    column_counter += 1
+
+            button = StandardButton(
+                self, "Create new\nParent...", BUTTON_REGULARDARK_COLOR)
+            button.clicked.connect(self.setupConnector)
+            grid.addWidget(button, row_counter, column_counter)
+
+            if dots:
+                self.set_window_properties()
+            else:
+                self.set_window_properties(noFocus=True)
+
+        self.setMinimumSize(width, height)
+
+        offset = QtCore.QPoint(width/2, height / 2)
+        self.move(QtGui.QCursor.pos() - offset)
+
+
+    def set_window_properties(self, noFocus=False):
         """Set window falgs and focused widget."""
 
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint |
@@ -128,13 +375,17 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
         # make sure the widgets closes when it loses focus
         self.installEventFilter(self)
-        self.input.setFocus()
+        if not noFocus:
+            self.input.setFocus()
 
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Escape:
             self.close()
+        if event.key() == QtCore.Qt.Key_Tab:
+            self.lineEnter()
 
     def clicked(self):
+
         UNDO.begin(UNDO_EVENT_TEXT)
 
         # create destination Node if none exists yet
@@ -146,12 +397,59 @@ class LabelConnector(QtGuiWidgets.QWidget):
         UNDO.end()
         self.close()
 
+    def clickedJump(self):
+        for i in nuke.selectedNodes():
+            i.setSelected(False)
+
+        self.node.input(0).setSelected(True)
+
+        nuke.zoomToFitSelected()
+
+        self.close()
+
+    def forceConnect(self):
+        self.close()
+        forceShowUI(self.node, self.dots)
+
+    def setColor(self):
+
+        color = self.sender().interfaceColor
+
+        if self.selectedConnectors:
+            for node in self.selectedConnectors:
+                node.knob('tile_color').setValue(color)
+        else:
+            self.node.knob('tile_color').setValue(color)
+        self.close()
+
+    def setupConnector(self):
+        self.close()
+        nameUi = NameConnector(self.node)
+        nameUi.show()
+
+    def selectColor(self):
+        self.close()
+        showColorSelectionMenu(self.selectedConnectors)
+
+    def selectChildren(self):
+        for i in nuke.selectedNodes():
+            i.setSelected(False)
+
+        for node in self.selectedConnectors:
+            for x in node.dependent(nuke.INPUTS | nuke.HIDDEN_INPUTS, forceEvaluate=False):
+                x.setSelected(True)
+
+        self.close()
+
     def lineEnter(self):
-        UNDO.begin(UNDO_EVENT_TEXT)
+        if self.input.text() == '':
+            self.close()
+            return
 
-        for dot in self.sender().dots:
-            if self.input.text() == dot.knob('label').getValue():
+        for dot in self.dots:
+            if self.input.text().upper() in dot.knob('label').getValue().upper():
 
+                UNDO.begin(UNDO_EVENT_TEXT)
                 # create destination Node if none exists yet
                 if not self.node:
                     createConnectingNodeAndConnect(dot)
@@ -162,12 +460,15 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 self.close()
                 break
 
-        UNDO.end()
-
     def eventFilter(self, object, event):
         if event.type() in [QtCore.QEvent.WindowDeactivate, QtCore.QEvent.FocusOut]:
             self.close()
             return True
+
+        return False
+
+    # override, to be able to use TAB as ENTER, like the Nuke Node Menu
+    def focusNextPrevChild(self, next: bool) -> bool:
         return False
 
 
@@ -209,6 +510,10 @@ def connectNodeToDot(node, dot):
     Returns:
         bool: True if new node connection was successful
     """
+
+    if not hasInputPossible(node):
+        return True
+
     UNDO.begin(UNDO_EVENT_TEXT)
 
     if node.setInput(0, dot):
@@ -242,7 +547,7 @@ def getAllConnectorDots():
                 connectorDots.append(dot)
                 compareList.append(dot["label"].value())
             else:
-                LOG.error("Double Label Entry found on Connector Dots, skipping dot: {} '{}' ".format(
+                logger.error("Double Label Entry found on Connector Dots, skipping dot: {} '{}' ".format(
                     dot.name(), dot["label"].value()))
                 doubleEntries = True
                 doubleEntriesList.append(dot)
@@ -258,52 +563,104 @@ def getAllConnectorDots():
     return connectorDots
 
 
-def runLabelMatch(forceShowUi=False):
+def labelConnector():
     """
     Entry function, determines if there are multiple nodes that shall be connected via label matching,
     or rather a single none-labeled or no node is selected so a new connection can be set up.
-
-    Args:
-        forceShowUi (bool, optional): Set true to force a new node connection on single and already labeled Node. Defaults to False.
     """
-    uiCheck = False  # True if the ConnectorUI should be shown or not
+
+    connectedSth = False
+    onlyConnectorDotsSelected = True
     nodes = nuke.selectedNodes()
     connectorDots = getAllConnectorDots()
 
-    if not forceShowUi:
-        for node in nodes:
-            if node.Class() not in neverConnectNodes:
-                if node["label"].value():  # only none labeled nodes show the UI
-                    if not node.name().startswith(CONNECTOR_KEY):
-                        for dot in connectorDots:
-                            if node["label"].value() == dot["label"].value():
-                                # Label Match has been found, try to connect the two Nodes
-                                uiCheck = False if connectNodeToDot(
-                                    node, dot) else True
-                                break
-                            else:
-                                uiCheck = True
-                else:
-                    uiCheck = True
+    for node in nodes:
+        if not isConnector(node):
+            onlyConnectorDotsSelected = False
+            if node["label"].value() and not isConnectedCorrectly(node):
+                for dot in connectorDots:
+                    if node["label"].value() == dot["label"].value():
+                        # Label Match has been found, try to connect the two Nodes
+                        if connectNodeToDot(node, dot):
+                            connectedSth = True
+                        break
 
-    if len(nodes) > 1:
-        # with more than one node, no new connections will be made, no UI shown.
+    if (len(nodes) > 1 or connectedSth) and not onlyConnectorDotsSelected:
+        # with more than one node, ore when connections were made, no new Dots will be set up, no UI shown.
         return
 
     global labelConnectorUi
 
-    # if the label is empty or no match could be found and the selection is just one node
-    if (uiCheck or forceShowUi) and nodes and connectorDots:
-        if forceShowUi:
-            node = nodes[0]
+    if nodes:
+
+        node = nodes[0]
+
+        if not hasInputPossible(node):
+            # clear list, so no possible connections are shown, as there are none possible
+            connectorDots = []
+
+        if isConnectedCorrectly(node):
+            labelConnectorUi = LabelConnector(
+                node, connectorDots, uitype=UIType.childrenSelectedOnly)
+            labelConnectorUi.show()
+            return
+
+        if onlyConnectorDotsSelected:
+            labelConnectorUi = LabelConnector(node,
+                                              selectedConnectors=nodes, uitype=UIType.connectorSelectedOnly)
+            labelConnectorUi.show()
+            return
+
         labelConnectorUi = LabelConnector(node, connectorDots)
         labelConnectorUi.show()
+        return
 
     # this will run and create a new node context based
-    if not nodes and connectorDots:
-        node = ""
-        labelConnectorUi = LabelConnector(node, connectorDots)
-        labelConnectorUi.show()
+    labelConnectorUi = LabelConnector(dots=connectorDots)
+    labelConnectorUi.show()
+    return
+
+
+def isConnectedCorrectly(node):
+    """
+    returns if the node is connected to the correct parent.
+    """
+    if not node.input(0):
+        return False
+    return node.knob('label').getValue() == node.input(0).knob('label').getValue()
+
+
+def isConnector(node):
+    return node.name().startswith(CONNECTOR_KEY)
+
+
+def forceShowUI(node, dots):
+    """
+    force to show UI despite there is already a label in the node.
+    Used to override existing connections.
+    """
+    global labelConnectorUi
+    labelConnectorUi = LabelConnector(node, dots)
+    labelConnectorUi.show()
+
+
+def showColorSelectionMenu(selectedConnectors):
+    """
+    force to show UI with color options
+    """
+    global labelConnectorUi
+    labelConnectorUi = LabelConnector(selectedConnectors[0],
+                                      selectedConnectors=selectedConnectors, uitype=UIType.showColorMenu)
+
+    labelConnectorUi.show()
+
+
+def hasInputPossible(node):
+    """
+    workaround to find out if a node can have connections. Because the "inputs" are still there
+    and could be forcefully connected to sth.
+    """
+    return "hide_input" in node.knobs() or node.Class() == "Viewer"
 
 
 def setConnectorDot(dot, txt):
@@ -319,60 +676,44 @@ def setConnectorDot(dot, txt):
     dot.knob('label').setValue(txt.upper())
 
 
-def makeConnector():
+def makeConnector(node, text, textOld):
     """
     Creates a new ConnectorDot (a Dot named "Connector..."), 
     or renames an existing selected one alongside all dependent nodes.
     """
 
-    nodes = nuke.selectedNodes()
-
-    if len(nodes) > 1:
-        return
-
     UNDO.begin(UNDO_EVENT_TEXT)
 
-    if nodes:
-        node = nodes[0]
+    text = text.upper()
+
+    if node:
         if node.Class() == "Dot":
             if CONNECTOR_KEY in node.name():
                 # rename existing ConnectorDot alongside dependent Nodes
-                txtold = node['label'].getValue()
-                txtnew = nuke.getInput('Rename Label', txtold)
 
-                if txtnew:
-                    txtnew = txtnew.upper()
-                    node['label'].setValue(txtnew)
-                    for x in node.dependent(nuke.INPUTS | nuke.HIDDEN_INPUTS, forceEvaluate=False):
-                        if x['label'].getValue() == txtold:
-                            x['label'].setValue(txtnew)
+                node['label'].setValue(text)
+                for x in node.dependent(nuke.INPUTS | nuke.HIDDEN_INPUTS, forceEvaluate=False):
+                    if x['label'].getValue() == textOld:
+                        x['label'].setValue(text)
 
             else:
-                # change existing Dot to ConnectorDot
-                txt = nuke.getInput('Set label', 'new label')
 
-                if txt:
-                    setConnectorDot(node, txt)
+                setConnectorDot(node, text)
 
         else:  # attach new ConnectorDot Node to any Node
-            txt = nuke.getInput('Set label', 'new label')
-
-            if txt:
-                node = nuke.createNode("Dot", inpanel=False)
-                setConnectorDot(node, txt)
-                node.setYpos(node.ypos()+50)
+            node = nuke.createNode("Dot", inpanel=False)
+            setConnectorDot(node, text)
+            node.setYpos(node.ypos()+50)
 
     else:  # create new independent ConnectorDot
-        txt = nuke.getInput('Set label', 'new label')
 
-        if txt:
-            node = nuke.createNode("Dot", inpanel=False)
-            setConnectorDot(node, txt)
+        node = nuke.createNode("Dot", inpanel=False)
+        setConnectorDot(node, text)
 
     UNDO.end()
 
 
-def interface2rgb(hexValue, normalize=True):
+def interface2rgb(hexValue):
     """
     Convert a color stored as a 32 bit value as used by nuke for interface colors to normalized rgb values.
 
