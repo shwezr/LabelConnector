@@ -569,13 +569,13 @@ def getAllConnectorDotsLabels():
     return connectorDotsLabels
 
 
-def isConnectedCorrectly(node):
+def isConnectorAndConnectedCorrectly(node):
     """
     returns if the node is connected to the correct parent.
     """
     if not node.input(0):
         return False
-    return node.knob('label').getValue() == node.input(0).knob('label').getValue()
+    return node.knob('label').getValue() == node.input(0).knob('label').getValue() and isConnectingNode(node)
 
 
 def isConnector(node):
@@ -777,7 +777,7 @@ def labelConnector(useNoOpNodesOnly=True):
     for node in nodes:
         if not isConnector(node):
             onlyConnectorDotsSelected = False
-            if node["label"].value() and not isConnectedCorrectly(node):
+            if node["label"].value() and not isConnectorAndConnectedCorrectly(node):
                 for dot in connectorDots:
                     if node["label"].value() == dot["label"].value():
                         # Label Match has been found, try to connect the two Nodes
@@ -786,7 +786,7 @@ def labelConnector(useNoOpNodesOnly=True):
                         break
 
     if (len(nodes) > 1 or connectedSth) and not onlyConnectorDotsSelected:
-        # with more than one node, ore when connections were made, no new Dots will be set up, no UI shown.
+        # with more than one node or when connections were made, no new Dots will be set up thus no UI shown.
         return
 
     global LABELCONNECTORUI
@@ -799,7 +799,7 @@ def labelConnector(useNoOpNodesOnly=True):
             # clear list, so no possible connections are shown, as there are none possible
             connectorDots = []
 
-        if isConnectedCorrectly(node):
+        if isConnectorAndConnectedCorrectly(node):
             LABELCONNECTORUI = LabelConnector(
                 node, connectorDots, uitype=UIType.UI_CHILDRENONLY)
             LABELCONNECTORUI.show()
@@ -811,11 +811,12 @@ def labelConnector(useNoOpNodesOnly=True):
             LABELCONNECTORUI.show()
             return
 
+        # will create  a prepending connector
         LABELCONNECTORUI = LabelConnector(node, connectorDots)
         LABELCONNECTORUI.show()
         return
 
-    # this will run and create a new node context based
+    # will create a standalone connector
     LABELCONNECTORUI = LabelConnector(dots=connectorDots)
     LABELCONNECTORUI.show()
     return

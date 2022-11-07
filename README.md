@@ -1,69 +1,52 @@
-# LabelConnector
-A Connector Tool for Nuke. Connect Nodes via label-matching. Super light-weight without callbacks. Uses simple ConnectorDots (Dot nodes named "Connector...") and node labels plus a handy UI to connect new nodes from anywhere in the DAG.
+# Label Connector
+A Connector Tool for Nuke with a handy UI. Super light-weight and very easy to use, just one single shortcut to create, setup, colorize and navigate these connections from anywhere in the Node Graph. No Callbacks, no hidden knobs created, to always stay compatible to other pipelines, or artists not having the Label Connector.
+
+![Create Connection 02](./.pictures/LabelConnectorMain.png)
 
 ## Quick Manual
 
-**alt+shift+A:** 
-- **no ConnectorDot selected:** Creates new ConnectorDot
-- **ConnectorDot selected:** Renames ConnectorDot alongside all dependent Nodes.
 
-**A:** 
-- **\>= 1 selected nodes:**  Connects all label matches. No ConnectorUI is shown.
-- **1 selected node, no label:** Shows ConnectorUI.
-- **0 selected nodes:** Will create a new PostageStamp/NoOp, showing the ConnectorUI.
- 
-**alt+A:** 
-- **1 selected node, any label:** Will show the ConnectorUI instead of connecting the existing label match.
+**Default Shortcut: A** - easily change this in the included menu.py. Use it to
+- create Parents, where you want to be able to connect to from anywhere
+- show possible Connections
+- jump to Parents or see all Children
+- colorize Parents to quickly identify them again
+- rename Parents, and alongside all Childrens
 
-You can change these Shortcuts in the attached menu.py.
+Based on the Node Selection, it will (should :) ) provide the options you need. If not, or you are missing something, please feel free to always reach out, I'm happy about any kind of feedback. :)
 
-Feel free to color your ConnectorDots, these colors will then appear in the ConnectorUI.
+---
+To install the plugin, just add
 
-Thanks to Falk Hofmann for helping with the UI and code clean up.
+```
+nuke.pluginAddPath('path_to_this_folder/LabelConnector')
+```
+to your menu.py in your Nuke User Folder.
 
-## Example
+Thanks to Johannes Hezer for the base and Falk Hofmann for helping with the UI and code clean up.
 
-Select any node you want to attach a Connector Dot to, press **alt+shift+A**.
 
-![Create Connector 01](./.pictures/LabelConnectorCreateConnector01.png)
-![Create Connector 02](./.pictures/LabelConnectorCreateConnector02.png)
+## Version
 
-\
-\
-You can also colorize the Connector Dot - I use the super handy W_HotBox for this, but feel free to choose any Node Color. The color will be reflected in the Connector UI.
+- v1.4: Big overhaul, reducting to one shortcut only while adding more functionality directly to the tool, like Colorization and Navigation. 
 
-![Create Color 01](./.pictures/LabelConnectorColor01.png)
+- v1.3: Option to choose if PostageStamps should be used or not. Also, determination if a PostageStamp is possible or it needs to be 3D compatible is now more bullet proof. 
 
-\
-\
-Click free DAG space, or any Node you want, and hit **A** to set a new connection.
+- v1.2: Never connect certain Nodes like Reads, Backdrops, ... Yes, apparently it's possible ;)
 
-![Create Connection 01](./.pictures/LabelConnectorConnection01.png)
+- v1.1: Default shortcuts are now way easier to reach. Less hand movement, more happy comping! =)
 
-\
-\
-You can type a Connector Name or click any button. With previously no Node selected, it will create a NoOp (3D) or PostageStamp (2D).
+- v1.0: initial release
 
-![Create Connection 02](./.pictures/LabelConnectorConnection02.png)
+## Examples
 
-\
-\
-Selecting a Connector Dot and hitting **alt+shift+A** again renames the Connector Dot as well as all attached Nodes.
-
-![Create Rename 01](./.pictures/LabelConnectorRename01.png)
-![Create Rename 02](./.pictures/LabelConnectorRename02.png)
-
-\
-\
-Buttons are sorted alphabetically.
-![Create Connection 03](./.pictures/LabelConnectorConnection03.png)
-
-\
-\
-After copy-pasting a group of Nodes, they're all selected. Just hit **A** to connect them all.
-
-![Create Connect 01](./.pictures/LabelConnectorConnect01.png)
-![Create Connect 02](./.pictures/LabelConnectorConnect02.png)
+Explanation Video:
+https://youtu.be/KIwTWMKP2u0
 
 
 
+![Create Connection 02](./.pictures/LabelConnector01.jpg)
+![Create Connection 02](./.pictures/LabelConnector011.jpg)
+![Create Connection 02](./.pictures/LabelConnector02.jpg)
+![Create Connection 02](./.pictures/LabelConnector03.jpg)
+![Create Connection 02](./.pictures/LabelConnector04.jpg)
