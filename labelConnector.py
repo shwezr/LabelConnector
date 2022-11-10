@@ -43,7 +43,7 @@ COLORLIST = {
     'Default': BUTTON_REGULAR_COLOR
 }
 
-# you can add more Classes, that you don't want to connect. 
+# you can add more Classes, that you don't want to connect.
 # Classes with no Inputs like Reads, Backdrops,... will already be ignored
 IGNORECLASSES = ["Viewer"]
 
@@ -341,10 +341,11 @@ class LabelConnector(QtGuiWidgets.QWidget):
         UNDO.begin(UNDO_EVENT_TEXT)
 
         # create destination Node if none exists yet
-        if not self.node:
-            self.node = createConnectingNodeAndConnect(self.sender().dot)
+
+        if self.node:
+            createConnectingNodeAndConnect(self.sender().dot, self.node)
         else:
-            connectNodeToDot(self.node, self.sender().dot)
+            createConnectingNodeAndConnect(self.sender().dot)
 
         UNDO.end()
         self.close()
@@ -415,10 +416,10 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
                     UNDO.begin(UNDO_EVENT_TEXT)
                     # create destination Node if none exists yet
-                    if not self.node:
-                        createConnectingNodeAndConnect(dot)
+                    if self.node:
+                        createConnectingNodeAndConnect(dot, self.node)
                     else:
-                        connectNodeToDot(self.node, dot)
+                        createConnectingNodeAndConnect(dot)
 
                     UNDO.end()
                     break
@@ -437,34 +438,50 @@ class LabelConnector(QtGuiWidgets.QWidget):
         return False
 
 
-def createConnectingNodeAndConnect(dot):
+def createConnectingNodeAndConnect(dot, node=None):
     """
     Creates a to-be-connected Node based on 2D or 3D/Deep type node tree
 
     Args:
         dot (node): Nuke Dot Node
+        node (node): Optional Nuke Node, to prepend the created node
 
     Returns:
         node: New Node to be connected
     """
+
+    UNDO.begin(UNDO_EVENT_TEXT)
 
     nodeClass = "PostageStamp"
 
     if not USE_POSTAGESTAMPS:
         nodeClass = "NoOp"
 
-    node = nuke.createNode(nodeClass, inpanel=False)
-    node.setName(CONNECTED_KEY)
+    connectingNode = nuke.createNode(nodeClass, inpanel=False)
+    if not connectNodeToDot(connectingNode, dot) and USE_POSTAGESTAMPS:
+        nuke.delete(connectingNode)
+        connectingNode = nuke.createNode("NoOp", inpanel=False)
+        connectNodeToDot(connectingNode, dot)
 
-    if not connectNodeToDot(node, dot) and USE_POSTAGESTAMPS:
-        nuke.delete(node)
-        node = nuke.createNode("NoOp", inpanel=False)
-        node.setName(CONNECTED_KEY)
-        connectNodeToDot(node, dot)
+    if node:
+        connectingNode.setXpos(
+            (node.xpos() + int(node.screenWidth()/2)) - int(connectingNode.screenWidth()/2))
+        if connectingNode.Class() == "NoOp":
+            offset = 50
+        else:
+            offset = 100
+        connectingNode.setYpos(node.ypos() - offset)
 
-    node.knob('tile_color').setValue(rgb2interface((80, 80, 80)))
+        if not node.setInput(0, connectingNode):
+            nuke.delete(connectingNode)
+            UNDO.end()
+            return
 
-    return node
+    connectingNode.setName(CONNECTED_KEY)
+    connectingNode.knob('label').setValue(dot['label'].getValue())
+    connectingNode.knob('tile_color').setValue(rgb2interface((80, 80, 80)))
+    connectingNode.knob("hide_input").setValue(True)
+    UNDO.end()
 
 
 def connectNodeToDot(node, dot):
@@ -479,44 +496,12 @@ def connectNodeToDot(node, dot):
         bool: True if new node connection was successful
     """
 
-    if not isConnectingNode(node):
-        if not hasPossibleInputs(node):
-            return True
-
-        UNDO.begin(UNDO_EVENT_TEXT)
-
-        connectingNode = createConnectingNodeAndConnect(dot)
-
-        if node.setInput(0, connectingNode):
-            connectingNode.setXpos(node.xpos())
-            if connectingNode.Class() == "NoOp":
-                offset = 50
-            else:
-                offset = 100
-            connectingNode.setYpos(node.ypos() - offset)
-
-            UNDO.end()
-            return True
-
-        else:
-            nuke.delete(connectingNode)
-
+    UNDO.begin(UNDO_EVENT_TEXT)
+    if node.setInput(0, dot):
         UNDO.end()
-        return False
-
-    else:
-
-        UNDO.begin(UNDO_EVENT_TEXT)
-
-        if node.setInput(0, dot):
-            node['label'].setValue(dot['label'].getValue())
-            node["hide_input"].setValue(True)
-
-            UNDO.end()
-            return True
-
-        UNDO.end()
-        return False
+        return True
+    UNDO.end()
+    return False
 
 
 def getAllConnectorDots():
@@ -787,6 +772,7 @@ def labelConnector(useNoOpNodesOnly=True):
 
     if (len(nodes) > 1 or connectedSth) and not onlyConnectorDotsSelected:
         # with more than one node or when connections were made, no new Dots will be set up thus no UI shown.
+        # except we have one or mulitple parents
         return
 
     global LABELCONNECTORUI
@@ -795,9 +781,11 @@ def labelConnector(useNoOpNodesOnly=True):
 
         node = nodes[0]
 
-        if not hasPossibleInputs(node):
-            # clear list, so no possible connections are shown, as there are none possible
-            connectorDots = []
+        if onlyConnectorDotsSelected:
+            LABELCONNECTORUI = LabelConnector(node,
+                                              selectedConnectors=nodes, uitype=UIType.UI_CONNECTORONLY)
+            LABELCONNECTORUI.show()
+            return
 
         if isConnectorAndConnectedCorrectly(node):
             LABELCONNECTORUI = LabelConnector(
@@ -805,9 +793,8 @@ def labelConnector(useNoOpNodesOnly=True):
             LABELCONNECTORUI.show()
             return
 
-        if onlyConnectorDotsSelected:
-            LABELCONNECTORUI = LabelConnector(node,
-                                              selectedConnectors=nodes, uitype=UIType.UI_CONNECTORONLY)
+        if not hasPossibleInputs(node):
+            LABELCONNECTORUI = LabelConnector(node, uitype=UIType.UI_NAMING)
             LABELCONNECTORUI.show()
             return
 
