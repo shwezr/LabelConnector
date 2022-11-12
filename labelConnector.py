@@ -22,10 +22,11 @@ import logging
 import math
 from enum import Enum
 
-LOGGER = logging.getLogger("labelMatcher")
+_log = logging.getLogger("labelMatcher")
 
-BUTTON = "border-radius: 8px; font: 13px; padding: 4px 10px;"
-BUTTON_HIGHLIGHTING = "border: 1px solid #AAAAAA;"
+BUTTON = "border-radius: 8px; font: 13px; padding: 4px 7px;"
+BUTTON_BORDERDEFAULT = "border: 1px solid #212121;"
+BUTTON_BORDERHIGHLIGHT = "border: 1px solid #AAAAAA;"
 BUTTON_REGULAR_COLOR = 673720575
 BUTTON_REGULARDARK_COLOR = 471802623
 BUTTON_HIGHLIGHT_COLOR = 2672760831
@@ -39,10 +40,11 @@ CONNECTED_KEY = "Connected"
 UNDO = nuke.Undo()
 UNDO_EVENT_TEXT = "Label Connector"
 
-USE_POSTAGESTAMPS = True
-LABELCONNECTORUI = ""
-
 OS = platform.system()
+
+_usePostageStamps = True
+_labelConnectorUI = ""
+
 
 
 COLORLIST = {
@@ -88,8 +90,7 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
         self.setMinimumWidth(100)
         self.setMaximumHeight(75)
         self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred, QtGuiWidgets.QSizePolicy.Expanding)
-        self.setStyleSheet("QPushButton{background-color:" + self.color + ";" + BUTTON + "} " +
-                           "QPushButton:hover{background-color:" + self.highlight + ";" + BUTTON + "}")
+        self.setStyleDefault()
 
     def enterEvent(self, event):
         """Change name with modifiers when mouse enters button."""
@@ -116,6 +117,16 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
 
     def setTextDefault(self):
         self.setText(self.label)
+        
+        
+    def setStyleHighlighted(self):
+        self.setStyleSheet("QPushButton{background-color:" + self.color + ";" + BUTTON + BUTTON_BORDERHIGHLIGHT + "} " +
+                            "QPushButton:hover{background-color:" + self.highlight + ";" + BUTTON + BUTTON_BORDERHIGHLIGHT + "}")
+
+        
+    def setStyleDefault(self):
+        self.setStyleSheet("QPushButton{background-color:" + self.color + ";" + BUTTON + BUTTON_BORDERDEFAULT + "} " +
+                           "QPushButton:hover{background-color:" + self.highlight + ";" + BUTTON + BUTTON_BORDERDEFAULT + "}")
 
 
 class StandardButton(QtGuiWidgets.QPushButton):
@@ -354,19 +365,20 @@ class LabelConnector(QtGuiWidgets.QWidget):
     def highlightButtonOnLineUpdate(self):
         """Give Matches a highlighting outline, reset others."""
 
-        self.input.setFocus()
-
         inputText = self.input.text().upper()
 
         for button in self.buttons:
-            button.setStyleSheet("QPushButton{background-color:" + button.color + ";" + BUTTON + "} " +
-                                 "QPushButton:hover{background-color:" + button.highlight + ";" + BUTTON + "}")
-
+            button.setStyleDefault()
+            
         if inputText:
             for button in self.buttons:
+                if inputText == button.text():
+                    button.setStyleHighlighted()
+                    return
+
+            for button in self.buttons:
                 if inputText in button.text():
-                    button.setStyleSheet("QPushButton{background-color:" + button.color + ";" + BUTTON + BUTTON_HIGHLIGHTING + "} " +
-                                         "QPushButton:hover{background-color:" + button.highlight + ";" + BUTTON + BUTTON_HIGHLIGHTING + "}")
+                    button.setStyleHighlighted()
 
     def keyPressEvent(self, event):
         """Catch key strokes, also to update highlighting of buttons."""
@@ -442,7 +454,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
             self.close()
 
         elif keyModifier == QtCore.Qt.AltModifier:
-            showConnectorUI(self.sender().dot)
+            _showConnectorUI(self.sender().dot)
 
         else:
             UNDO.begin(UNDO_EVENT_TEXT)
@@ -466,7 +478,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
     def forceConnect(self):
         """Click on Re-Connect"""
         self.close()
-        forceShowUI(self.node, self.dots)
+        _forceShowUI(self.node, self.dots)
 
     def setColor(self):
         """Click on Color Button"""
@@ -490,12 +502,12 @@ class LabelConnector(QtGuiWidgets.QWidget):
     def setupConnector(self):
         """Click on create or rename Parent"""
         self.close()
-        showNamingUI(self.node)
+        _showNamingUI(self.node)
 
     def selectColor(self):
         """Click on Color Menu"""
         self.close()
-        showColorSelectionUI(self.selectedConnectors)
+        _showColorSelectionUI(self.selectedConnectors)
 
     def selectChildren(self):
         """Click on Show all Connections"""
@@ -568,7 +580,8 @@ def createConnectingNodeAndConnect(dot, node=None):
 
     nodeClass = "PostageStamp"
 
-    if not USE_POSTAGESTAMPS:
+    global _usePostageStamps
+    if not _usePostageStamps:
         nodeClass = "NoOp"
 
     connectingNode = None
@@ -584,14 +597,14 @@ def createConnectingNodeAndConnect(dot, node=None):
 
     connectSuccess = connectNodeToDot(connectingNode, dot)
 
-    if not connectSuccess and USE_POSTAGESTAMPS and not connectorGiven:
+    if not connectSuccess and _usePostageStamps and not connectorGiven:
         xpos, ypos = connectingNode.xpos(), connectingNode.ypos()
         nuke.delete(connectingNode)
         connectingNode = nuke.createNode("NoOp", inpanel=False)
         connectingNode.setXYpos(xpos, ypos)
         connectNodeToDot(connectingNode, dot)
 
-    elif not connectSuccess and USE_POSTAGESTAMPS and connectorGiven:
+    elif not connectSuccess and _usePostageStamps and connectorGiven:
         UNDO.end()
         return
 
@@ -658,7 +671,7 @@ def getAllConnectorDots():
                 connectorDots.append(dot)
                 compareList.append(dot["label"].value())
             else:
-                LOGGER.error("Double Label Entry found on Connector Dots, skipping dot: {} '{}' ".format(
+                _log.error("Double Label Entry found on Connector Dots, skipping dot: {} '{}' ".format(
                     dot.name(), dot["label"].value()))
                 doubleEntries = True
                 doubleEntriesList.append(dot)
@@ -704,50 +717,50 @@ def isConnectingNode(node):
     return node.name().startswith(CONNECTED_KEY)
 
 
-def forceShowUI(node, dots):
+def _forceShowUI(node, dots):
     """
     force to show UI despite there is already a label in the node.
     Used to override existing connections.
     """
 
-    global LABELCONNECTORUI
+    global _labelConnectorUI
 
-    LABELCONNECTORUI = LabelConnector(node, dots)
-    LABELCONNECTORUI.show()
+    _labelConnectorUI = LabelConnector(node, dots)
+    _labelConnectorUI.show()
 
 
-def showColorSelectionUI(selectedConnectors):
+def _showColorSelectionUI(selectedConnectors):
     """
     force to show UI with color options
     """
 
-    global LABELCONNECTORUI
+    global _labelConnectorUI
 
-    LABELCONNECTORUI = LabelConnector(
+    _labelConnectorUI = LabelConnector(
         selectedConnectors[0], selectedConnectors=selectedConnectors, uitype=UIType.UI_COLOR)
-    LABELCONNECTORUI.show()
+    _labelConnectorUI.show()
 
 
-def showNamingUI(node):
+def _showNamingUI(node):
     """
     force to show UI with color options
     """
 
-    global LABELCONNECTORUI
+    global _labelConnectorUI
 
-    LABELCONNECTORUI = LabelConnector(node, uitype=UIType.UI_NAMING)
-    LABELCONNECTORUI.show()
+    _labelConnectorUI = LabelConnector(node, uitype=UIType.UI_NAMING)
+    _labelConnectorUI.show()
 
 
-def showConnectorUI(node):
+def _showConnectorUI(node):
     """
     force to show UI with color options
     """
 
-    global LABELCONNECTORUI
+    global _labelConnectorUI
 
-    LABELCONNECTORUI = LabelConnector(node, selectedConnectors=[node], uitype=UIType.UI_CONNECTORONLY)
-    LABELCONNECTORUI.show()
+    _labelConnectorUI = LabelConnector(node, selectedConnectors=[node], uitype=UIType.UI_CONNECTORONLY)
+    _labelConnectorUI.show()
 
 
 def hasPossibleInputs(node):
@@ -895,8 +908,8 @@ def labelConnector(useNoOpNodesOnly=True):
     """
 
     if useNoOpNodesOnly:
-        global USE_POSTAGESTAMPS
-        USE_POSTAGESTAMPS = False
+        global _usePostageStamps
+        _usePostageStamps = False
 
     connectedSth = False
     onlyConnectorDotsSelected = True
@@ -919,34 +932,34 @@ def labelConnector(useNoOpNodesOnly=True):
         # except we have one or mulitple parents
         return
 
-    global LABELCONNECTORUI
+    global _labelConnectorUI
 
     if nodes:
 
         node = nodes[0]
 
         if onlyConnectorDotsSelected:
-            LABELCONNECTORUI = LabelConnector(node, selectedConnectors=nodes, uitype=UIType.UI_CONNECTORONLY)
-            LABELCONNECTORUI.show()
+            _labelConnectorUI = LabelConnector(node, selectedConnectors=nodes, uitype=UIType.UI_CONNECTORONLY)
+            _labelConnectorUI.show()
             return
 
         if isConnectingAndConnectedCorrectly(node):
-            LABELCONNECTORUI = LabelConnector(
+            _labelConnectorUI = LabelConnector(
                 node, connectorDots, uitype=UIType.UI_CHILDRENONLY)
-            LABELCONNECTORUI.show()
+            _labelConnectorUI.show()
             return
 
         if not hasPossibleInputs(node):
-            LABELCONNECTORUI = LabelConnector(node, uitype=UIType.UI_NAMING)
-            LABELCONNECTORUI.show()
+            _labelConnectorUI = LabelConnector(node, uitype=UIType.UI_NAMING)
+            _labelConnectorUI.show()
             return
 
         # will create  a prepending connector
-        LABELCONNECTORUI = LabelConnector(node, connectorDots)
-        LABELCONNECTORUI.show()
+        _labelConnectorUI = LabelConnector(node, connectorDots)
+        _labelConnectorUI.show()
         return
 
     # will create a standalone connector
-    LABELCONNECTORUI = LabelConnector(dots=connectorDots)
-    LABELCONNECTORUI.show()
+    _labelConnectorUI = LabelConnector(dots=connectorDots)
+    _labelConnectorUI.show()
     return

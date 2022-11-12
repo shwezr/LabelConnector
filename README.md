@@ -17,8 +17,8 @@ https://youtu.be/KIwTWMKP2u0
 - colorize Parents to quickly identify them again
 - rename Parents, and alongside all Childrens
 
-**Shift-Click** Jumps directly to Connector. \
-**Alt-Click** Opens Connector Settings, same like having the parent selected.
+**Shift-Click:** Jumps directly to Connector. \
+**Alt-Click:** Opens Connector Settings, same like having the parent selected.
 
 Based on the Node Selection, it will (should :) ) provide the options you need. If not, or you are missing something, please feel free to always reach out, I'm happy about any kind of feedback. :)
 
