@@ -17,6 +17,9 @@ https://youtu.be/KIwTWMKP2u0
 - colorize Parents to quickly identify them again
 - rename Parents, and alongside all Childrens
 
+**Shift-Click** Jumps directly to Connector. \
+**Alt-Click** Opens Connector Settings, same like having the parent selected.
+
 Based on the Node Selection, it will (should :) ) provide the options you need. If not, or you are missing something, please feel free to always reach out, I'm happy about any kind of feedback. :)
 
 ---
@@ -32,7 +35,9 @@ Thanks to Johannes Hezer for the base and Falk Hofmann for helping with the UI a
 
 ## Version
 
-- v1.4: Big overhaul, reducting to one shortcut only while adding more functionality directly to the tool, like Colorization and Navigation. 
+- v1.5: Shift-Click jumps. Alt-Click modifies Parent. Highlighting search results.  
+
+- v1.4: Big overhaul, reducing to one shortcut only while adding more functionality directly to the tool, like Colorization and Navigation. 
 
 - v1.3: Option to choose if PostageStamps should be used or not. Also, determination if a PostageStamp is possible or it needs to be 3D compatible is now more bullet proof. 
 

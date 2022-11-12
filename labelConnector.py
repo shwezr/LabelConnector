@@ -1,22 +1,34 @@
-# labelConnector v1.4
-# Lukas Schwabe & Johannes Hezer
-# UI based on ChannelHotbox - Falk Hofmann
+"""
+labelConnector v1.5 - 11/2022
+Lukas Schwabe & Johannes Hezer
+UI based on ChannelHotbox - Falk Hofmann
 
+Provides context-based UI helpers to setup and navigate Node Connections in Nuke.
+
+Click:          Build connection / Choose option.
+Shift-Click:    Jumps directly to Connector. 
+Alt-Click:      Opens Connector Settings, same like having the parent selected.
+
+"""
+
+__version__ = 1.5
 
 import nuke
 import PySide2.QtCore as QtCore
 import PySide2.QtGui as QtGui
 import PySide2.QtWidgets as QtGuiWidgets
+import platform
 import logging
 import math
 from enum import Enum
 
 LOGGER = logging.getLogger("labelMatcher")
 
-BUTTON = "border-radius: 8px; font: 13px;"
+BUTTON = "border-radius: 8px; font: 13px; padding: 4px 10px;"
+BUTTON_HIGHLIGHTING = "border: 1px solid #AAAAAA;"
 BUTTON_REGULAR_COLOR = 673720575
 BUTTON_REGULARDARK_COLOR = 471802623
-BUTTON_HIGHLIGHT_COLOR = 3261606143
+BUTTON_HIGHLIGHT_COLOR = 2672760831
 
 SEARCHFIELD = "border-radius: 8px; font: 13px; border: 1px solid #212121;"
 RENAMEFIELD = "border-radius: 3px; font: 13px; border: 1px solid #212121;"
@@ -30,9 +42,12 @@ UNDO_EVENT_TEXT = "Label Connector"
 USE_POSTAGESTAMPS = True
 LABELCONNECTORUI = ""
 
+OS = platform.system()
+
+
 COLORLIST = {
     'Red': 1277436927,
-    'Orange': 2202599679,
+    'Orange': 2017657087,
     'Yellow': 2154504703,
     'Green': 793519103,
     'Dark Green': 304619007,
@@ -43,7 +58,7 @@ COLORLIST = {
     'Default': BUTTON_REGULAR_COLOR
 }
 
-# you can add more Classes, that you don't want to connect.
+# you can add more Classes that you don't want to connect.
 # Classes with no Inputs like Reads, Backdrops,... will already be ignored
 IGNORECLASSES = ["Viewer"]
 
@@ -62,24 +77,46 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
     def __init__(self, parent, dot, node):
         super(ConnectorButton, self).__init__(parent)
         self.setMouseTracking(True)
-        self.setText(dot.knob('label').getValue())
+        self.label = dot.knob('label').getValue()
+        self.setTextDefault()
         self.dot = dot
         self.node = node
+        self.entered = False
 
         self.setMinimumWidth(100)
+        self.setMaximumHeight(75)
         self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
                            QtGuiWidgets.QSizePolicy.Expanding)
         self.color = rgb2hex(interface2rgb(getTileColor(dot)))
         self.highlight = rgb2hex(interface2rgb(BUTTON_HIGHLIGHT_COLOR))
-        self.setStyleSheet("background-color:" + self.color + ";" + BUTTON)
+        self.setStyleSheet("QPushButton{background-color:" + self.color + ";" + BUTTON + "} " +
+                           "QPushButton:hover{background-color:" + self.highlight + ";" + BUTTON + "}")
 
     def enterEvent(self, event):
         """Change color to orange when mouse enters button."""
-        self.setStyleSheet("background-color:" + self.highlight + ";" + BUTTON)
+        keyModifier = QtGuiWidgets.QApplication.keyboardModifiers()
+
+        if keyModifier == QtCore.Qt.ShiftModifier:
+            self.setTextJump()
+
+        elif keyModifier == QtCore.Qt.AltModifier:
+            self.setTextModify()
+
+        self.entered = True
 
     def leaveEvent(self, event):
         """Change color to grey when mouse leaves button."""
-        self.setStyleSheet("background-color:" + self.color + ";" + BUTTON)
+        self.setTextDefault()
+        self.entered = False
+
+    def setTextJump(self):
+        self.setText("Jump to\n-\n" + self.label)
+
+    def setTextModify(self):
+        self.setText("Options...\n-\n" + self.label)
+
+    def setTextDefault(self):
+        self.setText(self.label)
 
 
 class StandardButton(QtGuiWidgets.QPushButton):
@@ -91,6 +128,8 @@ class StandardButton(QtGuiWidgets.QPushButton):
         self.setText(text)
 
         self.setMinimumWidth(100)
+        self.setMaximumHeight(75)
+        
 
         self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
                            QtGuiWidgets.QSizePolicy.Expanding)
@@ -99,24 +138,8 @@ class StandardButton(QtGuiWidgets.QPushButton):
 
         self.color = rgb2hex(interface2rgb(color))
         self.highlight = rgb2hex(interface2rgb(BUTTON_HIGHLIGHT_COLOR))
-        self.setStyleSheet("background-color:"+self.color + ";"
-                           + BUTTON
-                           #    + "font-style: italic;"
-                           )
-
-    def enterEvent(self, event):
-        """Change color to orange when mouse enters button."""
-        self.setStyleSheet("background-color:"+self.highlight + ";"
-                           + BUTTON
-                           #    + "font-style: italic;"
-                           )
-
-    def leaveEvent(self, event):
-        """Change color to  grey when mouse leaves button."""
-        self.setStyleSheet("background-color:"+self.color + ";"
-                           + BUTTON
-                           #    + "font-style: italic;"
-                           )
+        self.setStyleSheet("QPushButton{background-color:" + self.color + ";" + BUTTON + "} " +
+                           "QPushButton:hover{background-color:" + self.highlight + ";" + BUTTON + "}")
 
 # for later use, to overwrite autocompletion, nuke style,maybe
 # class Completer(QtGuiWidgets.QCompleter):
@@ -141,23 +164,24 @@ class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
             dot_list.append(dot.knob('label').getValue())
 
         self.setMinimumWidth(100)
+        self.setMaximumHeight(75)
+        
 
         self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
                            QtGuiWidgets.QSizePolicy.Expanding)
 
         self.completer = QtGuiWidgets.QCompleter(dot_list, self)
-        self.completer.setCaseSensitivity(
-            QtCore.Qt.CaseSensitivity.CaseInsensitive)
+        self.completer.setCaseSensitivity(QtCore.Qt.CaseSensitivity.CaseInsensitive)
         self.completer.setFilterMode(QtCore.Qt.MatchFlag.MatchContains)
-        # self.completer.setModelSorting(QtGuiWidgets.QCompleter.CaseInsensitivelySortedModel)
+        self.completer.popup().setWindowFlags(QtCore.Qt.Tool | QtCore.Qt.FramelessWindowHint)
 
         self.setCompleter(self.completer)
 
-    def keyPressEvent(self, event):
-        """bounce back event to main ui to catch and overwrite TAB behaviour"""
+    # def keyPressEvent(self, event):
+    #     """bounce back event to main ui to catch and overwrite TAB behaviour"""
 
-        super(LineEditConnectSelection, self).keyPressEvent(event)
-        self.parent().keyPressEvent(event)
+    #     super(LineEditConnectSelection, self).keyPressEvent(event)
+    #     self.parent().keyPressEvent(event)
 
 
 class LineEditNaming(QtGuiWidgets.QLineEdit):
@@ -165,6 +189,8 @@ class LineEditNaming(QtGuiWidgets.QLineEdit):
 
     def __init__(self, parent):
         super(LineEditNaming, self).__init__(parent)
+        self.setMaximumHeight(75)
+        
         self.parent = parent
         self.setStyleSheet(RENAMEFIELD)
         self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
@@ -180,11 +206,15 @@ class LabelConnector(QtGuiWidgets.QWidget):
         self.selectedConnectors = selectedConnectors
         self.dots = dots
         self.uiType = uitype
+        self.shiftPressed = False
+        self.altPressed = False
+
+        if uitype == UIType.UI_DEFAULT:
+            self.buttons = list()
 
         super(LabelConnector, self).__init__()
 
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
-                           QtGuiWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred, QtGuiWidgets.QSizePolicy.Expanding)
 
         grid = QtGuiWidgets.QGridLayout()
         self.setLayout(grid)
@@ -219,14 +249,14 @@ class LabelConnector(QtGuiWidgets.QWidget):
             else:
                 width, height = 300, 100
 
-            button = StandardButton(self, "Select All Children")
-            button.clicked.connect(self.selectChildren)
+            button = StandardButton(self, "Colorize...")
+            button.clicked.connect(self.selectColor)
             grid.addWidget(button, row_counter, column_counter)
 
             column_counter += 1
 
-            button = StandardButton(self, "Colorize...")
-            button.clicked.connect(self.selectColor)
+            button = StandardButton(self, "Select All Children")
+            button.clicked.connect(self.selectChildren)
             grid.addWidget(button, row_counter, column_counter)
 
         elif uitype == UIType.UI_COLOR:
@@ -253,15 +283,15 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
             self.textOld = ""
             if self.node:
-                self.textOld = node.knob('label').getValue()
-                self.input.setText(self.textOld)
-                self.input.selectAll()
+                if isConnector(self.node):
+                    self.textOld = node.knob('label').getValue()
+                    self.input.setText(self.textOld)
+                    self.input.selectAll()
 
             width, height = 200, 75
             self.setFixedHeight(height)
             self.setMinimumWidth(width)
-            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
-                               QtGuiWidgets.QSizePolicy.Preferred)
+            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred, QtGuiWidgets.QSizePolicy.Preferred)
 
             grid.addWidget(self.input)
 
@@ -283,6 +313,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 button = ConnectorButton(self, dot, node)
                 button.clicked.connect(self.clicked)
                 grid.addWidget(button, row_counter, column_counter)
+                self.buttons.append(button)
 
                 if column_counter > length:
                     row_counter += 1
@@ -294,8 +325,11 @@ class LabelConnector(QtGuiWidgets.QWidget):
             if dots:
                 self.input = LineEditConnectSelection(self, dots, node)
                 grid.addWidget(self.input, row_counter, column_counter)
+
+                self.input.textChanged.connect(self.highlightButtonOnLineUpdate)
                 self.input.returnPressed.connect(self.lineEnter)
-                self.input.completer.popup().clicked.connect(self.lineEnter)
+                self.input.completer.popup().pressed.connect(self.lineEnter)
+
                 self.hasInputField = True
 
                 if column_counter > length:
@@ -305,8 +339,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 else:
                     column_counter += 1
 
-            button = StandardButton(
-                self, "Create New\nParent...", BUTTON_REGULARDARK_COLOR)
+            button = StandardButton(self, "Create New\nParent...", BUTTON_REGULARDARK_COLOR)
             button.clicked.connect(self.setupConnector)
             grid.addWidget(button, row_counter, column_counter)
 
@@ -319,38 +352,113 @@ class LabelConnector(QtGuiWidgets.QWidget):
     def set_window_properties(self, setFocus=False):
         """Set window falgs and focused widget."""
 
-        self.setWindowFlags(QtCore.Qt.FramelessWindowHint |
-                            QtCore.Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
 
-        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.setAttribute(QtCore.Qt.WA_NoSystemBackground)
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
 
-        # make sure the widgets closes when it loses focus
         self.installEventFilter(self)
 
         if setFocus:
             self.input.setFocus()
 
+    def highlightButtonOnLineUpdate(self):
+        """Give Matches a highlighting outline, reset others."""
+
+        self.input.setFocus()
+
+        inputText = self.input.text().upper()
+
+        for button in self.buttons:
+            button.setStyleSheet("QPushButton{background-color:" + button.color + ";" + BUTTON + "} " +
+                                 "QPushButton:hover{background-color:" + button.highlight + ";" + BUTTON + "}")
+
+        if inputText:
+            for button in self.buttons:
+                if inputText in button.text():
+                    button.setStyleSheet("QPushButton{background-color:" + button.color + ";" + BUTTON + BUTTON_HIGHLIGHTING + "} " +
+                                         "QPushButton:hover{background-color:" + button.highlight + ";" + BUTTON + BUTTON_HIGHLIGHTING + "}")
+
     def keyPressEvent(self, event):
+        """Catch key strokes, also to update highlighting of buttons."""
         if event.key() == QtCore.Qt.Key_Escape:
             self.close()
-        if event.key() == QtCore.Qt.Key_Tab:
+            return
+        elif event.key() == QtCore.Qt.Key_Tab:
             self.lineEnter()
+            return
+        if self.uiType == UIType.UI_DEFAULT:
+            keyModifier = QtGuiWidgets.QApplication.keyboardModifiers()
+
+            if event.key() == QtCore.Qt.Key_Shift:
+                self.shiftPressed = True
+            elif event.key() == QtCore.Qt.Key_Alt:
+                self.altPressed = True
+
+            if event.key() == QtCore.Qt.Key_Shift and not self.altPressed:
+                for button in self.buttons:
+                    if button.entered:
+                        button.setTextJump()
+            elif event.key() == QtCore.Qt.Key_Alt and not self.shiftPressed:
+                for button in self.buttons:
+                    if button.entered:
+                        button.setTextModify()
+
+            elif event.key() in [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Shift]:
+                for button in self.buttons:
+                    button.setTextDefault()
+
+            if self.hasInputField:
+                self.input.completer.popup().keyPressEvent(event)
+
+    def keyReleaseEvent(self, event):
+        """Catch key strokes, also to update highlighting of buttons."""
+
+        if self.uiType == UIType.UI_DEFAULT:
+            if event.key() == QtCore.Qt.Key_Shift:
+                self.shiftPressed = False
+            elif event.key() == QtCore.Qt.Key_Alt:
+                self.altPressed = False
+
+            if event.key() == QtCore.Qt.Key_Shift and self.altPressed:
+                for button in self.buttons:
+                    if button.entered:
+                        button.setTextModify()
+            elif event.key() == QtCore.Qt.Key_Alt and self.shiftPressed:
+                for button in self.buttons:
+                    if button.entered:
+                        button.setTextJump()
+            elif event.key() in [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Shift]:
+                for button in self.buttons:
+                    button.setTextDefault()
 
     def clicked(self):
-        UNDO.begin(UNDO_EVENT_TEXT)
+        """Clicking actions based on pressed Modifier Keys"""
+        keyModifier = QtGuiWidgets.QApplication.keyboardModifiers()
 
-        # create destination Node if none exists yet
+        if keyModifier == QtCore.Qt.ShiftModifier:
+            for i in nuke.selectedNodes():
+                i.setSelected(False)
+            self.sender().dot.setSelected(True)
+            nuke.zoomToFitSelected()
+            self.close()
 
-        if self.node:
-            createConnectingNodeAndConnect(self.sender().dot, self.node)
+        elif keyModifier == QtCore.Qt.AltModifier:
+            showConnectorUI(self.sender().dot)
+
         else:
-            createConnectingNodeAndConnect(self.sender().dot)
+            UNDO.begin(UNDO_EVENT_TEXT)
+            if self.node:
+                createConnectingNodeAndConnect(self.sender().dot, self.node)
+            else:
+                createConnectingNodeAndConnect(self.sender().dot)
 
-        UNDO.end()
+            UNDO.end()
+
         self.close()
 
     def clickedJump(self):
+        """Click on Jump To Parent"""
         for i in nuke.selectedNodes():
             i.setSelected(False)
         self.node.input(0).setSelected(True)
@@ -358,10 +466,12 @@ class LabelConnector(QtGuiWidgets.QWidget):
         self.close()
 
     def forceConnect(self):
+        """Click on Re-Connect"""
         self.close()
         forceShowUI(self.node, self.dots)
 
     def setColor(self):
+        """Click on Color Button"""
         color = self.sender().interfaceColor
 
         if color == BUTTON_REGULAR_COLOR:
@@ -380,14 +490,17 @@ class LabelConnector(QtGuiWidgets.QWidget):
         self.close()
 
     def setupConnector(self):
+        """Click on create or rename Parent"""
         self.close()
         showNamingUI(self.node)
 
     def selectColor(self):
+        """Click on Color Menu"""
         self.close()
         showColorSelectionUI(self.selectedConnectors)
 
     def selectChildren(self):
+        """Click on Show all Connections"""
         for i in nuke.selectedNodes():
             i.setSelected(False)
 
@@ -398,6 +511,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
         self.close()
 
     def lineEnter(self):
+        """After pressing Enter or Tab"""
         if not self.hasInputField:
             return
 
@@ -428,13 +542,16 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
     def eventFilter(self, object, event):
         if event.type() in [QtCore.QEvent.WindowDeactivate, QtCore.QEvent.FocusOut]:
+            if self.hasInputField and self.uiType == UIType.UI_DEFAULT:
+                self.input.completer.popup().close()
+
             self.close()
             return True
 
         return False
 
     def focusNextPrevChild(self, next):
-        """override, to be able to use TAB as ENTER, like the Nuke Node Menu"""
+        """overriding this, to be able to use TAB as ENTER, like the Nuke Node Menu"""
         return False
 
 
@@ -457,13 +574,31 @@ def createConnectingNodeAndConnect(dot, node=None):
     if not USE_POSTAGESTAMPS:
         nodeClass = "NoOp"
 
-    connectingNode = nuke.createNode(nodeClass, inpanel=False)
-    if not connectNodeToDot(connectingNode, dot) and USE_POSTAGESTAMPS:
-        nuke.delete(connectingNode)
-        connectingNode = nuke.createNode("NoOp", inpanel=False)
-        connectNodeToDot(connectingNode, dot)
+    connectingNode = None
+    connectorGiven = False
 
     if node:
+        if isConnectingNode(node):
+            connectingNode = node
+            connectorGiven = True
+
+    if not connectingNode:
+        connectingNode = nuke.createNode(nodeClass, inpanel=False)
+
+    connectSuccess = connectNodeToDot(connectingNode, dot)
+
+    if not connectSuccess and USE_POSTAGESTAMPS and not connectorGiven:
+        xpos, ypos = connectingNode.xpos(), connectingNode.ypos()
+        nuke.delete(connectingNode)
+        connectingNode = nuke.createNode("NoOp", inpanel=False)
+        connectingNode.setXYpos(xpos, ypos)
+        connectNodeToDot(connectingNode, dot)
+
+    elif not connectSuccess and USE_POSTAGESTAMPS and connectorGiven:
+        UNDO.end()
+        return
+
+    if node and not connectorGiven:
         connectingNode.setXpos(
             (node.xpos() + int(node.screenWidth()/2)) - int(connectingNode.screenWidth()/2))
         if connectingNode.Class() == "NoOp":
@@ -481,6 +616,7 @@ def createConnectingNodeAndConnect(dot, node=None):
     connectingNode.knob('label').setValue(dot['label'].getValue())
     connectingNode.knob('tile_color').setValue(rgb2interface((80, 80, 80)))
     connectingNode.knob("hide_input").setValue(True)
+
     UNDO.end()
 
 
@@ -554,7 +690,7 @@ def getAllConnectorDotsLabels():
     return connectorDotsLabels
 
 
-def isConnectorAndConnectedCorrectly(node):
+def isConnectingAndConnectedCorrectly(node):
     """
     returns if the node is connected to the correct parent.
     """
@@ -590,8 +726,8 @@ def showColorSelectionUI(selectedConnectors):
 
     global LABELCONNECTORUI
 
-    LABELCONNECTORUI = LabelConnector(selectedConnectors[0],
-                                      selectedConnectors=selectedConnectors, uitype=UIType.UI_COLOR)
+    LABELCONNECTORUI = LabelConnector(
+        selectedConnectors[0], selectedConnectors=selectedConnectors, uitype=UIType.UI_COLOR)
     LABELCONNECTORUI.show()
 
 
@@ -603,6 +739,17 @@ def showNamingUI(node):
     global LABELCONNECTORUI
 
     LABELCONNECTORUI = LabelConnector(node, uitype=UIType.UI_NAMING)
+    LABELCONNECTORUI.show()
+
+
+def showConnectorUI(node):
+    """
+    force to show UI with color options
+    """
+
+    global LABELCONNECTORUI
+
+    LABELCONNECTORUI = LabelConnector(node, selectedConnectors=[node], uitype=UIType.UI_CONNECTORONLY)
     LABELCONNECTORUI.show()
 
 
@@ -747,7 +894,7 @@ def hex2rgb(hexColor):
 
 def labelConnector(useNoOpNodesOnly=True):
     """
-    Entry function. Determines, which UI to open.
+    Entry function. Determines, which UI to open based on context.
     """
 
     if useNoOpNodesOnly:
@@ -762,7 +909,7 @@ def labelConnector(useNoOpNodesOnly=True):
     for node in nodes:
         if not isConnector(node):
             onlyConnectorDotsSelected = False
-            if node["label"].value() and not isConnectorAndConnectedCorrectly(node):
+            if node["label"].value() and not isConnectingAndConnectedCorrectly(node):
                 for dot in connectorDots:
                     if node["label"].value() == dot["label"].value():
                         # Label Match has been found, try to connect the two Nodes
@@ -782,12 +929,11 @@ def labelConnector(useNoOpNodesOnly=True):
         node = nodes[0]
 
         if onlyConnectorDotsSelected:
-            LABELCONNECTORUI = LabelConnector(node,
-                                              selectedConnectors=nodes, uitype=UIType.UI_CONNECTORONLY)
+            LABELCONNECTORUI = LabelConnector(node, selectedConnectors=nodes, uitype=UIType.UI_CONNECTORONLY)
             LABELCONNECTORUI.show()
             return
 
-        if isConnectorAndConnectedCorrectly(node):
+        if isConnectingAndConnectedCorrectly(node):
             LABELCONNECTORUI = LabelConnector(
                 node, connectorDots, uitype=UIType.UI_CHILDRENONLY)
             LABELCONNECTORUI.show()
