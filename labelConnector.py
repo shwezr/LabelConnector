@@ -78,22 +78,21 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
         super(ConnectorButton, self).__init__(parent)
         self.setMouseTracking(True)
         self.label = dot.knob('label').getValue()
-        self.setTextDefault()
         self.dot = dot
         self.node = node
         self.entered = False
-
-        self.setMinimumWidth(100)
-        self.setMaximumHeight(75)
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
-                           QtGuiWidgets.QSizePolicy.Expanding)
         self.color = rgb2hex(interface2rgb(getTileColor(dot)))
         self.highlight = rgb2hex(interface2rgb(BUTTON_HIGHLIGHT_COLOR))
+
+        self.setTextDefault()
+        self.setMinimumWidth(100)
+        self.setMaximumHeight(75)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred, QtGuiWidgets.QSizePolicy.Expanding)
         self.setStyleSheet("QPushButton{background-color:" + self.color + ";" + BUTTON + "} " +
                            "QPushButton:hover{background-color:" + self.highlight + ";" + BUTTON + "}")
 
     def enterEvent(self, event):
-        """Change color to orange when mouse enters button."""
+        """Change name with modifiers when mouse enters button."""
         keyModifier = QtGuiWidgets.QApplication.keyboardModifiers()
 
         if keyModifier == QtCore.Qt.ShiftModifier:
@@ -105,7 +104,7 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
         self.entered = True
 
     def leaveEvent(self, event):
-        """Change color to grey when mouse leaves button."""
+        """Change reset name when mouse leaves button."""
         self.setTextDefault()
         self.entered = False
 
@@ -129,10 +128,8 @@ class StandardButton(QtGuiWidgets.QPushButton):
 
         self.setMinimumWidth(100)
         self.setMaximumHeight(75)
-        
 
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
-                           QtGuiWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred, QtGuiWidgets.QSizePolicy.Expanding)
 
         self.interfaceColor = color
 
@@ -165,10 +162,8 @@ class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
 
         self.setMinimumWidth(100)
         self.setMaximumHeight(75)
-        
 
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
-                           QtGuiWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred, QtGuiWidgets.QSizePolicy.Expanding)
 
         self.completer = QtGuiWidgets.QCompleter(dot_list, self)
         self.completer.setCaseSensitivity(QtCore.Qt.CaseSensitivity.CaseInsensitive)
@@ -189,16 +184,14 @@ class LineEditNaming(QtGuiWidgets.QLineEdit):
 
     def __init__(self, parent):
         super(LineEditNaming, self).__init__(parent)
-        self.setMaximumHeight(75)
-        
         self.parent = parent
+        self.setMaximumHeight(75)
         self.setStyleSheet(RENAMEFIELD)
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
-                           QtGuiWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred, QtGuiWidgets.QSizePolicy.Expanding)
 
 
 class LabelConnector(QtGuiWidgets.QWidget):
-    """User Interface class to provide buttons for each found ConnectorDot."""
+    """Core LabelConnector UI."""
 
     def __init__(self, node=None, dots=None, selectedConnectors=None, uitype=UIType.UI_DEFAULT):
 
@@ -299,7 +292,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
             self.hasInputField = True
 
-        else:
+        else:  # uitype == UIType.UI_DEFAULT
 
             lenGrid = len(dots) + 1
 
@@ -307,7 +300,6 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 lenGrid += 1
 
             length = math.ceil(math.sqrt(lenGrid))
-            width, height = length * 150, length * 50
 
             for dot in dots:
                 button = ConnectorButton(self, dot, node)
@@ -343,23 +335,20 @@ class LabelConnector(QtGuiWidgets.QWidget):
             button.clicked.connect(self.setupConnector)
             grid.addWidget(button, row_counter, column_counter)
 
+            width, height = length * 150, (row_counter + 1) * 75
+
         self.setMinimumSize(width, height)
 
         offset = QtCore.QPoint(width/2, height / 2)
         self.move(QtGui.QCursor.pos() - offset)
-        self.set_window_properties(self.hasInputField)
-
-    def set_window_properties(self, setFocus=False):
-        """Set window falgs and focused widget."""
 
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
-
         self.setAttribute(QtCore.Qt.WA_NoSystemBackground)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
 
         self.installEventFilter(self)
 
-        if setFocus:
+        if self.hasInputField:
             self.input.setFocus()
 
     def highlightButtonOnLineUpdate(self):
@@ -384,14 +373,15 @@ class LabelConnector(QtGuiWidgets.QWidget):
         if event.key() == QtCore.Qt.Key_Escape:
             self.close()
             return
+
         elif event.key() == QtCore.Qt.Key_Tab:
             self.lineEnter()
             return
-        if self.uiType == UIType.UI_DEFAULT:
-            keyModifier = QtGuiWidgets.QApplication.keyboardModifiers()
 
+        if self.uiType == UIType.UI_DEFAULT:
             if event.key() == QtCore.Qt.Key_Shift:
                 self.shiftPressed = True
+
             elif event.key() == QtCore.Qt.Key_Alt:
                 self.altPressed = True
 
@@ -399,10 +389,13 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 for button in self.buttons:
                     if button.entered:
                         button.setTextJump()
+                        break
+
             elif event.key() == QtCore.Qt.Key_Alt and not self.shiftPressed:
                 for button in self.buttons:
                     if button.entered:
                         button.setTextModify()
+                        break
 
             elif event.key() in [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Shift]:
                 for button in self.buttons:
@@ -417,6 +410,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
         if self.uiType == UIType.UI_DEFAULT:
             if event.key() == QtCore.Qt.Key_Shift:
                 self.shiftPressed = False
+
             elif event.key() == QtCore.Qt.Key_Alt:
                 self.altPressed = False
 
@@ -424,10 +418,14 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 for button in self.buttons:
                     if button.entered:
                         button.setTextModify()
+                        break
+
             elif event.key() == QtCore.Qt.Key_Alt and self.shiftPressed:
                 for button in self.buttons:
                     if button.entered:
                         button.setTextJump()
+                        break
+
             elif event.key() in [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Shift]:
                 for button in self.buttons:
                     button.setTextDefault()
@@ -519,8 +517,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
             if self.input.text():
                 makeConnector(self.node, self.input.text(), self.textOld)
 
-        # standard UI
-        else:
+        else:  # uitype == UIType.UI_NAMING
             if self.input.text() == '':
                 self.close()
                 return
