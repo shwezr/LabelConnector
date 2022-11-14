@@ -46,7 +46,6 @@ _usePostageStamps = True
 _labelConnectorUI = ""
 
 
-
 COLORLIST = {
     'Red': 1277436927,
     'Orange': 2017657087,
@@ -89,7 +88,8 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
         self.setTextDefault()
         self.setMinimumWidth(100)
         self.setMaximumHeight(75)
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred, QtGuiWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
+                           QtGuiWidgets.QSizePolicy.Expanding)
         self.setStyleDefault()
 
     def enterEvent(self, event):
@@ -117,13 +117,11 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
 
     def setTextDefault(self):
         self.setText(self.label)
-        
-        
+
     def setStyleHighlighted(self):
         self.setStyleSheet("QPushButton{background-color:" + self.color + ";" + BUTTON + BUTTON_BORDERHIGHLIGHT + "} " +
-                            "QPushButton:hover{background-color:" + self.highlight + ";" + BUTTON + BUTTON_BORDERHIGHLIGHT + "}")
+                           "QPushButton:hover{background-color:" + self.highlight + ";" + BUTTON + BUTTON_BORDERHIGHLIGHT + "}")
 
-        
     def setStyleDefault(self):
         self.setStyleSheet("QPushButton{background-color:" + self.color + ";" + BUTTON + BUTTON_BORDERDEFAULT + "} " +
                            "QPushButton:hover{background-color:" + self.highlight + ";" + BUTTON + BUTTON_BORDERDEFAULT + "}")
@@ -140,7 +138,8 @@ class StandardButton(QtGuiWidgets.QPushButton):
         self.setMinimumWidth(100)
         self.setMaximumHeight(75)
 
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred, QtGuiWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
+                           QtGuiWidgets.QSizePolicy.Expanding)
 
         self.interfaceColor = color
 
@@ -174,12 +173,15 @@ class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
         self.setMinimumWidth(100)
         self.setMaximumHeight(75)
 
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred, QtGuiWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
+                           QtGuiWidgets.QSizePolicy.Expanding)
 
         self.completer = QtGuiWidgets.QCompleter(dot_list, self)
-        self.completer.setCaseSensitivity(QtCore.Qt.CaseSensitivity.CaseInsensitive)
+        self.completer.setCaseSensitivity(
+            QtCore.Qt.CaseSensitivity.CaseInsensitive)
         self.completer.setFilterMode(QtCore.Qt.MatchFlag.MatchContains)
-        self.completer.popup().setWindowFlags(QtCore.Qt.Tool | QtCore.Qt.FramelessWindowHint)
+        self.completer.popup().setWindowFlags(
+            QtCore.Qt.Tool | QtCore.Qt.FramelessWindowHint)
 
         self.setCompleter(self.completer)
 
@@ -198,7 +200,8 @@ class LineEditNaming(QtGuiWidgets.QLineEdit):
         self.parent = parent
         self.setMaximumHeight(75)
         self.setStyleSheet(RENAMEFIELD)
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred, QtGuiWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
+                           QtGuiWidgets.QSizePolicy.Expanding)
 
 
 class LabelConnector(QtGuiWidgets.QWidget):
@@ -218,7 +221,8 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
         super(LabelConnector, self).__init__()
 
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred, QtGuiWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
+                           QtGuiWidgets.QSizePolicy.Expanding)
 
         grid = QtGuiWidgets.QGridLayout()
         self.setLayout(grid)
@@ -295,7 +299,8 @@ class LabelConnector(QtGuiWidgets.QWidget):
             width, height = 200, 75
             self.setFixedHeight(height)
             self.setMinimumWidth(width)
-            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred, QtGuiWidgets.QSizePolicy.Preferred)
+            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
+                               QtGuiWidgets.QSizePolicy.Preferred)
 
             grid.addWidget(self.input)
 
@@ -329,7 +334,8 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 self.input = LineEditConnectSelection(self, dots, node)
                 grid.addWidget(self.input, row_counter, column_counter)
 
-                self.input.textChanged.connect(self.highlightButtonOnLineUpdate)
+                self.input.textChanged.connect(
+                    self.highlightButtonOnLineUpdate)
                 self.input.returnPressed.connect(self.lineEnter)
                 self.input.completer.popup().pressed.connect(self.lineEnter)
 
@@ -342,7 +348,8 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 else:
                     column_counter += 1
 
-            button = StandardButton(self, "Create New\nParent...", BUTTON_REGULARDARK_COLOR)
+            button = StandardButton(
+                self, "Create New\nParent...", BUTTON_REGULARDARK_COLOR)
             button.clicked.connect(self.setupConnector)
             grid.addWidget(button, row_counter, column_counter)
 
@@ -353,7 +360,8 @@ class LabelConnector(QtGuiWidgets.QWidget):
         offset = QtCore.QPoint(width/2, height / 2)
         self.move(QtGui.QCursor.pos() - offset)
 
-        self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(QtCore.Qt.FramelessWindowHint |
+                            QtCore.Qt.WindowStaysOnTopHint)
         self.setAttribute(QtCore.Qt.WA_NoSystemBackground)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
 
@@ -369,7 +377,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
         for button in self.buttons:
             button.setStyleDefault()
-            
+
         if inputText:
             for button in self.buttons:
                 if inputText == button.text():
@@ -447,10 +455,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
         keyModifier = QtGuiWidgets.QApplication.keyboardModifiers()
 
         if keyModifier == QtCore.Qt.ShiftModifier:
-            for i in nuke.selectedNodes():
-                i.setSelected(False)
-            self.sender().dot.setSelected(True)
-            nuke.zoomToFitSelected()
+            jumpKeepingPreviousSelection(self.sender().dot)
             self.close()
 
         elif keyModifier == QtCore.Qt.AltModifier:
@@ -469,10 +474,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
     def clickedJump(self):
         """Click on Jump To Parent"""
-        for i in nuke.selectedNodes():
-            i.setSelected(False)
-        self.node.input(0).setSelected(True)
-        nuke.zoomToFitSelected()
+        jumpKeepingPreviousSelection(self.node)
         self.close()
 
     def forceConnect(self):
@@ -650,6 +652,22 @@ def connectNodeToDot(node, dot):
     return False
 
 
+def jumpKeepingPreviousSelection(node):
+    """Jump to node without destroyng previous selection of nodes"""
+
+    prevNodes = nuke.selectedNodes()
+
+    for i in prevNodes:
+        i.setSelected(False)
+
+    node.setSelected(True)
+    nuke.zoomToFitSelected()
+    node.setSelected(False)
+
+    for i in prevNodes:
+        i.setSelected(True)
+
+
 def getAllConnectorDots():
     """
     get all ConnectorDots with a valid label, warn if there are double entries found.
@@ -759,7 +777,8 @@ def _showConnectorUI(node):
 
     global _labelConnectorUI
 
-    _labelConnectorUI = LabelConnector(node, selectedConnectors=[node], uitype=UIType.UI_CONNECTORONLY)
+    _labelConnectorUI = LabelConnector(node, selectedConnectors=[
+                                       node], uitype=UIType.UI_CONNECTORONLY)
     _labelConnectorUI.show()
 
 
@@ -939,7 +958,8 @@ def labelConnector(useNoOpNodesOnly=True):
         node = nodes[0]
 
         if onlyConnectorDotsSelected:
-            _labelConnectorUI = LabelConnector(node, selectedConnectors=nodes, uitype=UIType.UI_CONNECTORONLY)
+            _labelConnectorUI = LabelConnector(
+                node, selectedConnectors=nodes, uitype=UIType.UI_CONNECTORONLY)
             _labelConnectorUI.show()
             return
 
