@@ -20,19 +20,22 @@ import PySide2.QtWidgets as QtGuiWidgets
 import platform
 import logging
 import math
+
+import fnmatch
 from enum import Enum
+
 
 _log = logging.getLogger("labelMatcher")
 
-BUTTON = "border-radius: 8px; font: 13px; padding: 4px 7px;"
+BUTTON = "border-radius: 5px; font: 13px; padding: 4px 7px;"
 BUTTON_BORDERDEFAULT = "border: 1px solid #212121;"
 BUTTON_BORDERHIGHLIGHT = "border: 1px solid #AAAAAA;"
 BUTTON_REGULAR_COLOR = 673720575
 BUTTON_REGULARDARK_COLOR = 471802623
 BUTTON_HIGHLIGHT_COLOR = 2672760831
 
-SEARCHFIELD = "border-radius: 8px; font: 13px; border: 1px solid #212121;"
-RENAMEFIELD = "border-radius: 3px; font: 13px; border: 1px solid #212121;"
+SEARCHFIELD = "border-radius: 5px; font: 13px; border: 1px solid #212121;"
+RENAMEFIELD = "border-radius: 5px; font: 13px; border: 1px solid #212121;"
 
 CONNECTOR_KEY = "Connector"
 CONNECTED_KEY = "Connected"
@@ -148,13 +151,6 @@ class StandardButton(QtGuiWidgets.QPushButton):
         self.setStyleSheet("QPushButton{background-color:" + self.color + ";" + BUTTON + "} " +
                            "QPushButton:hover{background-color:" + self.highlight + ";" + BUTTON + "}")
 
-# for later use, to overwrite autocompletion, nuke style,maybe
-# class Completer(QtGuiWidgets.QCompleter):
-#     """Custom QLineEdit with combined auto completion."""
-
-#     def __init__(self, dot_list, parent):
-#         super(Completer, self).__init__(dot_list, parent)
-
 
 class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
     """Custom QLineEdit with combined auto completion."""
@@ -166,9 +162,11 @@ class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
         self.dots = dots
         self.setStyleSheet(SEARCHFIELD)
 
-        dot_list = []
+        self.dotNameList = []
         for dot in dots:
-            dot_list.append(dot.knob('label').getValue())
+            self.dotNameList.append(dot.knob('label').getValue())
+
+        self.filteredDotNameList = self.dotNameList
 
         self.setMinimumWidth(100)
         self.setMaximumHeight(75)
@@ -176,20 +174,19 @@ class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
         self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
                            QtGuiWidgets.QSizePolicy.Expanding)
 
-        self.completer = QtGuiWidgets.QCompleter(dot_list, self)
-        self.completer.setCaseSensitivity(
-            QtCore.Qt.CaseSensitivity.CaseInsensitive)
-        self.completer.setFilterMode(QtCore.Qt.MatchFlag.MatchContains)
-        self.completer.popup().setWindowFlags(
-            QtCore.Qt.Tool | QtCore.Qt.FramelessWindowHint)
+        self.completer = QtGuiWidgets.QCompleter(self.filteredDotNameList, self)
+        self.completer.setCompletionMode(QtGuiWidgets.QCompleter.UnfilteredPopupCompletion)
 
         self.setCompleter(self.completer)
 
-    # def keyPressEvent(self, event):
-    #     """bounce back event to main ui to catch and overwrite TAB behaviour"""
+    def keyPressEvent(self, event):
+        """bounce back event to main ui to catch and overwrite TAB behaviour"""
 
-    #     super(LineEditConnectSelection, self).keyPressEvent(event)
-    #     self.parent().keyPressEvent(event)
+        super(LineEditConnectSelection, self).keyPressEvent(event)
+        self.parent().keyPressEvent(event)
+
+    def updateCompleterList(self):
+        self.completer.model().setStringList(self.filteredDotNameList)
 
 
 class LineEditNaming(QtGuiWidgets.QLineEdit):
@@ -334,8 +331,8 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 self.input = LineEditConnectSelection(self, dots, node)
                 grid.addWidget(self.input, row_counter, column_counter)
 
-                self.input.textChanged.connect(
-                    self.highlightButtonOnLineUpdate)
+                self.input.textEdited.connect(self.updateSearchMatches)
+                self.input.textChanged.connect(self.highlightButtonsMatchingResults)
                 self.input.returnPressed.connect(self.lineEnter)
                 self.input.completer.popup().pressed.connect(self.lineEnter)
 
@@ -370,8 +367,25 @@ class LabelConnector(QtGuiWidgets.QWidget):
         if self.hasInputField:
             self.input.setFocus()
 
-    def highlightButtonOnLineUpdate(self):
+    def updateSearchMatches(self):
         """Give Matches a highlighting outline, reset others."""
+
+        inputText = self.input.text().upper()
+
+        self.input.filteredDotNameList = []
+        self.highlightButtons = []
+
+        query = '*' + '*'.join([inputText[j:j+1] for j in range(len(inputText))]) + '*'
+
+        for button in self.buttons:
+            if fnmatch.fnmatch(button.text(), query):
+                self.highlightButtons.append(button)
+                self.input.filteredDotNameList.append(button.text())
+                button.setStyleHighlighted()
+
+        self.input.updateCompleterList()
+
+    def highlightButtonsMatchingResults(self):
 
         inputText = self.input.text().upper()
 
@@ -384,9 +398,8 @@ class LabelConnector(QtGuiWidgets.QWidget):
                     button.setStyleHighlighted()
                     return
 
-            for button in self.buttons:
-                if inputText in button.text():
-                    button.setStyleHighlighted()
+        for button in self.highlightButtons:
+            button.setStyleHighlighted()
 
     def keyPressEvent(self, event):
         """Catch key strokes, also to update highlighting of buttons."""
@@ -420,9 +433,6 @@ class LabelConnector(QtGuiWidgets.QWidget):
             elif event.key() in [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Shift]:
                 for button in self.buttons:
                     button.setTextDefault()
-
-            if self.hasInputField:
-                self.input.completer.popup().keyPressEvent(event)
 
     def keyReleaseEvent(self, event):
         """Catch key strokes, also to update highlighting of buttons."""
@@ -536,25 +546,34 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 self.close()
                 return
 
+            connectDot = ''
+
             for dot in self.dots:
-                if self.input.text().upper() in dot.knob('label').getValue().upper():
-
-                    UNDO.begin(UNDO_EVENT_TEXT)
-                    # create destination Node if none exists yet
-                    if self.node:
-                        createConnectingNodeAndConnect(dot, self.node)
-                    else:
-                        createConnectingNodeAndConnect(dot)
-
-                    UNDO.end()
+                if self.input.text().upper() == dot.knob('label').getValue().upper():
+                    connectDot = dot
                     break
+
+            if not connectDot:
+                for dot in self.dots:
+                    if self.input.filteredDotNameList[0] == dot.knob('label').getValue().upper():
+                        connectDot = dot
+                        break
+
+            if connectDot:
+                UNDO.begin(UNDO_EVENT_TEXT)
+                # create destination Node if none exists yet
+                if self.node:
+                    createConnectingNodeAndConnect(connectDot, self.node)
+                else:
+                    createConnectingNodeAndConnect(connectDot)
+                UNDO.end()
 
         self.close()
 
     def eventFilter(self, object, event):
-        if event.type() in [QtCore.QEvent.WindowDeactivate, QtCore.QEvent.FocusOut]:
-            if self.hasInputField and self.uiType == UIType.UI_DEFAULT:
-                self.input.completer.popup().close()
+        if object == self and event.type() in [QtCore.QEvent.WindowDeactivate, QtCore.QEvent.FocusOut]:
+            # if self.hasInputField and self.uiType == UIType.UI_DEFAULT:
+            #     self.input.completer.popup().close()
 
             self.close()
             return True
