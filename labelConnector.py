@@ -484,7 +484,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
     def clickedJump(self):
         """Click on Jump To Parent"""
-        jumpKeepingPreviousSelection(self.node)
+        jumpKeepingPreviousSelection(self.node.input(0))
         self.close()
 
     def forceConnect(self):
