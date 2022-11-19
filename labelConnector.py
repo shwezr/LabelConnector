@@ -24,7 +24,6 @@ import math
 import fnmatch
 from enum import Enum
 
-
 _log = logging.getLogger("labelMatcher")
 
 BUTTON = "border-radius: 5px; font: 13px; padding: 4px 7px;"
@@ -32,7 +31,7 @@ BUTTON_BORDERDEFAULT = "border: 1px solid #212121;"
 BUTTON_BORDERHIGHLIGHT = "border: 1px solid #AAAAAA;"
 BUTTON_REGULAR_COLOR = 673720575
 BUTTON_REGULARDARK_COLOR = 471802623
-BUTTON_HIGHLIGHT_COLOR = 2672760831
+BUTTON_HIGHLIGHT_COLOR = 3329297663
 
 SEARCHFIELD = "border-radius: 5px; font: 13px; border: 1px solid #212121;"
 RENAMEFIELD = "border-radius: 5px; font: 13px; border: 1px solid #212121;"
@@ -89,9 +88,13 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
         self.highlight = rgb2hex(interface2rgb(BUTTON_HIGHLIGHT_COLOR))
 
         self.setTextDefault()
+
+        self.setMaximumHeight(65)
+        self.setMinimumHeight(65)
         self.setMinimumWidth(100)
-        self.setMaximumHeight(75)
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
+        self.setMaximumWidth(250)
+
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding,
                            QtGuiWidgets.QSizePolicy.Expanding)
         self.setStyleDefault()
 
@@ -138,10 +141,12 @@ class StandardButton(QtGuiWidgets.QPushButton):
         self.setMouseTracking(True)
         self.setText(text)
 
+        self.setMaximumHeight(65)
+        self.setMinimumHeight(65)
         self.setMinimumWidth(100)
-        self.setMaximumHeight(75)
+        self.setMaximumWidth(150)
 
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding,
                            QtGuiWidgets.QSizePolicy.Expanding)
 
         self.interfaceColor = color
@@ -157,7 +162,7 @@ class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
 
     def __init__(self, parent, dots, node):
         super(LineEditConnectSelection, self).__init__(parent)
-        # self.parent = parent
+
         self.node = node
         self.dots = dots
         self.setStyleSheet(SEARCHFIELD)
@@ -166,16 +171,36 @@ class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
         for dot in dots:
             self.dotNameList.append(dot.knob('label').getValue())
 
-        self.filteredDotNameList = self.dotNameList
+        self.filteredDotNameList = []
 
-        self.setMinimumWidth(100)
-        self.setMaximumHeight(75)
+        self.setMaximumHeight(65)
+        self.setMinimumHeight(65)
+        self.setMinimumWidth(150)
+        self.setMaximumWidth(150)
 
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding,
                            QtGuiWidgets.QSizePolicy.Expanding)
+
+        self.itemDelegate = QtGuiWidgets.QStyledItemDelegate(self)
+
+        self.listWidget = QtGuiWidgets.QListView(parent)
+        self.listWidget.hide()
+        self.model = QtCore.QStringListModel(self.filteredDotNameList)
+        self.listWidget.setModel(self.model)
 
         self.completer = QtGuiWidgets.QCompleter(self.filteredDotNameList, self)
         self.completer.setCompletionMode(QtGuiWidgets.QCompleter.UnfilteredPopupCompletion)
+        
+        self.completer.popup().setMouseTracking(True)
+        self.completer.popup().setStyleSheet("QAbstractItemView:item:hover{background-color:#484848;}")
+        self.completer.popup().setItemDelegate(self.itemDelegate)
+        
+        self.completer.popup().setMaximumHeight(65)
+        self.completer.popup().setMinimumHeight(65)
+        self.completer.popup().setMinimumWidth(100)
+        self.completer.popup().setMaximumWidth(150)
+        self.completer.popup().setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding,
+                                             QtGuiWidgets.QSizePolicy.Expanding)
 
         self.setCompleter(self.completer)
 
@@ -195,7 +220,7 @@ class LineEditNaming(QtGuiWidgets.QLineEdit):
     def __init__(self, parent):
         super(LineEditNaming, self).__init__(parent)
         self.parent = parent
-        self.setMaximumHeight(75)
+        self.setMaximumHeight(65)
         self.setStyleSheet(RENAMEFIELD)
         self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
                            QtGuiWidgets.QSizePolicy.Expanding)
@@ -205,6 +230,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
     """Core LabelConnector UI."""
 
     def __init__(self, node=None, dots=None, selectedConnectors=None, uitype=UIType.UI_DEFAULT):
+        super(LabelConnector, self).__init__()
 
         self.node = node
         self.selectedConnectors = selectedConnectors
@@ -215,11 +241,6 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
         if uitype == UIType.UI_DEFAULT:
             self.buttons = list()
-
-        super(LabelConnector, self).__init__()
-
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
-                           QtGuiWidgets.QSizePolicy.Expanding)
 
         grid = QtGuiWidgets.QGridLayout()
         self.setLayout(grid)
@@ -239,6 +260,9 @@ class LabelConnector(QtGuiWidgets.QWidget):
             button = StandardButton(self, "Re-Connect to...")
             button.clicked.connect(self.forceConnect)
             grid.addWidget(button, row_counter, column_counter)
+            
+            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding,
+                               QtGuiWidgets.QSizePolicy.Expanding)
 
         elif uitype == UIType.UI_CONNECTORONLY:
 
@@ -263,6 +287,9 @@ class LabelConnector(QtGuiWidgets.QWidget):
             button = StandardButton(self, "Select All Children")
             button.clicked.connect(self.selectChildren)
             grid.addWidget(button, row_counter, column_counter)
+            
+            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding,
+                               QtGuiWidgets.QSizePolicy.Expanding)
 
         elif uitype == UIType.UI_COLOR:
 
@@ -282,6 +309,9 @@ class LabelConnector(QtGuiWidgets.QWidget):
                     column_counter += 1
 
             self.hasInputField = False
+            
+            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding,
+                               QtGuiWidgets.QSizePolicy.Expanding)
 
         elif uitype == UIType.UI_NAMING:
             self.input = LineEditNaming(self)
@@ -307,10 +337,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
         else:  # uitype == UIType.UI_DEFAULT
 
-            lenGrid = len(dots) + 1
-
-            if dots:
-                lenGrid += 1
+            lenGrid = len(dots)
 
             length = math.ceil(math.sqrt(lenGrid))
 
@@ -320,16 +347,14 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 grid.addWidget(button, row_counter, column_counter)
                 self.buttons.append(button)
 
+                column_counter += 1
                 if column_counter > length:
                     row_counter += 1
                     column_counter = 0
 
-                else:
-                    column_counter += 1
-
             if dots:
                 self.input = LineEditConnectSelection(self, dots, node)
-                grid.addWidget(self.input, row_counter, column_counter)
+                grid.addWidget(self.input, 1, length+1)
 
                 self.input.textEdited.connect(self.updateSearchMatches)
                 self.input.textChanged.connect(self.highlightButtonsMatchingResults)
@@ -337,28 +362,23 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 self.input.completer.popup().pressed.connect(self.lineEnter)
 
                 self.hasInputField = True
-
-                if column_counter > length:
-                    row_counter += 1
-                    column_counter = 0
-
-                else:
-                    column_counter += 1
+                grid.addWidget(self.input.completer.popup(), 2, length+1)
+                if row_counter < 3:
+                    grid.setRowStretch(2, 1)
 
             button = StandardButton(
                 self, "Create New\nParent...", BUTTON_REGULARDARK_COLOR)
             button.clicked.connect(self.setupConnector)
-            grid.addWidget(button, row_counter, column_counter)
+            grid.addWidget(button, 0, length+1)
 
-            width, height = length * 150, (row_counter + 1) * 75
-
-        self.setMinimumSize(width, height)
+            width, height = (length) * 160, max(row_counter, 3) * 75
+            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding,
+                               QtGuiWidgets.QSizePolicy.Expanding)
 
         offset = QtCore.QPoint(width/2, height / 2)
         self.move(QtGui.QCursor.pos() - offset)
 
-        self.setWindowFlags(QtCore.Qt.FramelessWindowHint |
-                            QtCore.Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
         self.setAttribute(QtCore.Qt.WA_NoSystemBackground)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
 
@@ -368,24 +388,37 @@ class LabelConnector(QtGuiWidgets.QWidget):
             self.input.setFocus()
 
     def updateSearchMatches(self):
-        """Give Matches a highlighting outline, reset others."""
+        """
+        Searches for matches, filling the list for the completer as well as the highlighting. 
+        This won't update when stepping through the completer list via up/down arrow keys.
+        """
 
         inputText = self.input.text().upper()
 
         self.input.filteredDotNameList = []
         self.highlightButtons = []
 
-        query = '*' + '*'.join([inputText[j:j+1] for j in range(len(inputText))]) + '*'
+        if inputText:
 
-        for button in self.buttons:
-            if fnmatch.fnmatch(button.text(), query):
-                self.highlightButtons.append(button)
-                self.input.filteredDotNameList.append(button.text())
-                button.setStyleHighlighted()
+            query = '*' + '*'.join([inputText[j:j+1] for j in range(len(inputText))]) + '*'
+
+            tempListUnsorted = []
+
+            for button in self.buttons:
+                if fnmatch.fnmatch(button.text(), query):
+                    self.highlightButtons.append(button)
+                    tempListUnsorted.append(button.text())
+
+            for index, name in enumerate(tempListUnsorted):
+                if inputText == name:
+                    self.input.filteredDotNameList.append(tempListUnsorted.pop(index))
+
+            self.input.filteredDotNameList.extend(tempListUnsorted)
 
         self.input.updateCompleterList()
 
     def highlightButtonsMatchingResults(self):
+        """Highlights all Buttons matching the search result. Except there is a perfect match, then just this one."""
 
         inputText = self.input.text().upper()
 
@@ -393,13 +426,13 @@ class LabelConnector(QtGuiWidgets.QWidget):
             button.setStyleDefault()
 
         if inputText:
-            for button in self.buttons:
+            for button in self.highlightButtons:
                 if inputText == button.text():
                     button.setStyleHighlighted()
                     return
 
-        for button in self.highlightButtons:
-            button.setStyleHighlighted()
+            for button in self.highlightButtons:
+                button.setStyleHighlighted()
 
     def keyPressEvent(self, event):
         """Catch key strokes, also to update highlighting of buttons."""
@@ -433,6 +466,9 @@ class LabelConnector(QtGuiWidgets.QWidget):
             elif event.key() in [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Shift]:
                 for button in self.buttons:
                     button.setTextDefault()
+
+            if event.key() in [QtCore.Qt.Key_Up, QtCore.Qt.Key_Down]:
+                self.input.completer.popup().keyPressEvent(event)
 
     def keyReleaseEvent(self, event):
         """Catch key strokes, also to update highlighting of buttons."""
@@ -614,6 +650,8 @@ def createConnectingNodeAndConnect(dot, node=None):
             connectorGiven = True
 
     if not connectingNode:
+        for n in nuke.selectedNodes():
+            n.setSelected(False)
         connectingNode = nuke.createNode(nodeClass, inpanel=False)
 
     connectSuccess = connectNodeToDot(connectingNode, dot)
@@ -621,6 +659,8 @@ def createConnectingNodeAndConnect(dot, node=None):
     if not connectSuccess and _usePostageStamps and not connectorGiven:
         xpos, ypos = connectingNode.xpos(), connectingNode.ypos()
         nuke.delete(connectingNode)
+        for n in nuke.selectedNodes():
+            n.setSelected(False)
         connectingNode = nuke.createNode("NoOp", inpanel=False)
         connectingNode.setXYpos(xpos, ypos)
         connectNodeToDot(connectingNode, dot)
