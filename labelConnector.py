@@ -192,7 +192,6 @@ class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
         self.completer.popup().setStyleSheet("QAbstractItemView:item:hover{background-color:#484848;}")
         self.completer.popup().setItemDelegate(self.itemDelegate)
 
-        self.completer.popup().setMaximumHeight(65)
         self.completer.popup().setMinimumHeight(65)
         self.completer.popup().setMinimumWidth(100)
         self.completer.popup().setMaximumWidth(150)
@@ -347,8 +346,10 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 self.input.completer.popup().pressed.connect(self.lineEnter)
 
                 self.hasInputField = True
-                grid.addWidget(self.input.completer.popup(), 2, length+1)
-                if row_counter < 3:
+                grid.addWidget(self.input.completer.popup(), 2, length+1,  max(1, grid.rowCount()-2), 1)
+
+                if grid.rowCount() < 4:
+                    self.input.completer.popup().setMaximumHeight(65)
                     grid.setRowStretch(2, 1)
 
             button = StandardButton(
