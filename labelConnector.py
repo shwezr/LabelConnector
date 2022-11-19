@@ -94,8 +94,7 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
         self.setMinimumWidth(100)
         self.setMaximumWidth(250)
 
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding,
-                           QtGuiWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
         self.setStyleDefault()
 
     def enterEvent(self, event):
@@ -146,8 +145,7 @@ class StandardButton(QtGuiWidgets.QPushButton):
         self.setMinimumWidth(100)
         self.setMaximumWidth(150)
 
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding,
-                           QtGuiWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
 
         self.interfaceColor = color
 
@@ -178,8 +176,7 @@ class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
         self.setMinimumWidth(150)
         self.setMaximumWidth(150)
 
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding,
-                           QtGuiWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
 
         self.itemDelegate = QtGuiWidgets.QStyledItemDelegate(self)
 
@@ -190,25 +187,18 @@ class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
 
         self.completer = QtGuiWidgets.QCompleter(self.filteredDotNameList, self)
         self.completer.setCompletionMode(QtGuiWidgets.QCompleter.UnfilteredPopupCompletion)
-        
+
         self.completer.popup().setMouseTracking(True)
         self.completer.popup().setStyleSheet("QAbstractItemView:item:hover{background-color:#484848;}")
         self.completer.popup().setItemDelegate(self.itemDelegate)
-        
+
         self.completer.popup().setMaximumHeight(65)
         self.completer.popup().setMinimumHeight(65)
         self.completer.popup().setMinimumWidth(100)
         self.completer.popup().setMaximumWidth(150)
-        self.completer.popup().setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding,
-                                             QtGuiWidgets.QSizePolicy.Expanding)
+        self.completer.popup().setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
 
         self.setCompleter(self.completer)
-
-    def keyPressEvent(self, event):
-        """bounce back event to main ui to catch and overwrite TAB behaviour"""
-
-        super(LineEditConnectSelection, self).keyPressEvent(event)
-        self.parent().keyPressEvent(event)
 
     def updateCompleterList(self):
         self.completer.model().setStringList(self.filteredDotNameList)
@@ -222,8 +212,7 @@ class LineEditNaming(QtGuiWidgets.QLineEdit):
         self.parent = parent
         self.setMaximumHeight(65)
         self.setStyleSheet(RENAMEFIELD)
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
-                           QtGuiWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred, QtGuiWidgets.QSizePolicy.Expanding)
 
 
 class LabelConnector(QtGuiWidgets.QWidget):
@@ -260,9 +249,8 @@ class LabelConnector(QtGuiWidgets.QWidget):
             button = StandardButton(self, "Re-Connect to...")
             button.clicked.connect(self.forceConnect)
             grid.addWidget(button, row_counter, column_counter)
-            
-            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding,
-                               QtGuiWidgets.QSizePolicy.Expanding)
+
+            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
 
         elif uitype == UIType.UI_CONNECTORONLY:
 
@@ -287,9 +275,8 @@ class LabelConnector(QtGuiWidgets.QWidget):
             button = StandardButton(self, "Select All Children")
             button.clicked.connect(self.selectChildren)
             grid.addWidget(button, row_counter, column_counter)
-            
-            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding,
-                               QtGuiWidgets.QSizePolicy.Expanding)
+
+            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
 
         elif uitype == UIType.UI_COLOR:
 
@@ -309,9 +296,8 @@ class LabelConnector(QtGuiWidgets.QWidget):
                     column_counter += 1
 
             self.hasInputField = False
-            
-            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding,
-                               QtGuiWidgets.QSizePolicy.Expanding)
+
+            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
 
         elif uitype == UIType.UI_NAMING:
             self.input = LineEditNaming(self)
@@ -326,8 +312,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
             width, height = 200, 75
             self.setFixedHeight(height)
             self.setMinimumWidth(width)
-            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred,
-                               QtGuiWidgets.QSizePolicy.Preferred)
+            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred, QtGuiWidgets.QSizePolicy.Preferred)
 
             grid.addWidget(self.input)
 
@@ -372,8 +357,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
             grid.addWidget(button, 0, length+1)
 
             width, height = (length) * 160, max(row_counter, 3) * 75
-            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding,
-                               QtGuiWidgets.QSizePolicy.Expanding)
+            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
 
         offset = QtCore.QPoint(width/2, height / 2)
         self.move(QtGui.QCursor.pos() - offset)
@@ -409,9 +393,15 @@ class LabelConnector(QtGuiWidgets.QWidget):
                     self.highlightButtons.append(button)
                     tempListUnsorted.append(button.text())
 
-            for index, name in enumerate(tempListUnsorted):
-                if inputText == name:
-                    self.input.filteredDotNameList.append(tempListUnsorted.pop(index))
+            for n in list(tempListUnsorted):
+                if n.startswith(inputText):
+                    self.input.filteredDotNameList.append(n)
+                    tempListUnsorted.remove(n)
+
+            for n in list(tempListUnsorted):
+                if inputText in n:
+                    self.input.filteredDotNameList.append(n)
+                    tempListUnsorted.remove(n)
 
             self.input.filteredDotNameList.extend(tempListUnsorted)
 
@@ -596,21 +586,24 @@ class LabelConnector(QtGuiWidgets.QWidget):
                         break
 
             if connectDot:
-                UNDO.begin(UNDO_EVENT_TEXT)
-                # create destination Node if none exists yet
-                if self.node:
-                    createConnectingNodeAndConnect(connectDot, self.node)
+                keyModifier = QtGuiWidgets.QApplication.keyboardModifiers()
+
+                if keyModifier == QtCore.Qt.ShiftModifier:
+                    jumpKeepingPreviousSelection(connectDot)
+
                 else:
-                    createConnectingNodeAndConnect(connectDot)
-                UNDO.end()
+                    UNDO.begin(UNDO_EVENT_TEXT)
+                    # create destination Node if none exists yet
+                    if self.node:
+                        createConnectingNodeAndConnect(connectDot, self.node)
+                    else:
+                        createConnectingNodeAndConnect(connectDot)
+                    UNDO.end()
 
         self.close()
 
     def eventFilter(self, object, event):
         if object == self and event.type() in [QtCore.QEvent.WindowDeactivate, QtCore.QEvent.FocusOut]:
-            # if self.hasInputField and self.uiType == UIType.UI_DEFAULT:
-            #     self.input.completer.popup().close()
-
             self.close()
             return True
 
@@ -868,7 +861,7 @@ def makeConnector(node, text, textOld):
     Creates a new ConnectorDot (a Dot named "Connector..."), 
     or renames an existing selected one alongside all dependent nodes.
     """
-    text = text.upper()
+    text = text.strip(" ").upper()
 
     if text in getAllConnectorDotsLabels():
         nuke.message("Label already in use")
