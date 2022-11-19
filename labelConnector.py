@@ -88,14 +88,12 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
         self.highlight = rgb2hex(interface2rgb(BUTTON_HIGHLIGHT_COLOR))
 
         self.setTextDefault()
+        self.setStyleDefault()
 
-        self.setMaximumHeight(65)
-        self.setMinimumHeight(65)
         self.setMinimumWidth(100)
         self.setMaximumWidth(250)
-
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
-        self.setStyleDefault()
+        self.setFixedHeight(65)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Fixed, QtGuiWidgets.QSizePolicy.Expanding)
 
     def enterEvent(self, event):
         """Change name with modifiers when mouse enters button."""
@@ -140,11 +138,9 @@ class StandardButton(QtGuiWidgets.QPushButton):
         self.setMouseTracking(True)
         self.setText(text)
 
-        self.setMaximumHeight(65)
-        self.setMinimumHeight(65)
         self.setMinimumWidth(100)
         self.setMaximumWidth(150)
-
+        self.setFixedHeight(65)
         self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Fixed)
 
         self.interfaceColor = color
@@ -171,11 +167,7 @@ class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
 
         self.filteredDotNameList = []
 
-        self.setMaximumHeight(65)
-        self.setMinimumHeight(65)
-        self.setMinimumWidth(150)
-        self.setMaximumWidth(150)
-
+        self.setFixedSize(150, 65)
         self.setSizePolicy(QtGuiWidgets.QSizePolicy.Fixed, QtGuiWidgets.QSizePolicy.Fixed)
 
         self.itemDelegate = QtGuiWidgets.QStyledItemDelegate(self)
@@ -209,7 +201,9 @@ class LineEditNaming(QtGuiWidgets.QLineEdit):
     def __init__(self, parent):
         super(LineEditNaming, self).__init__(parent)
         self.parent = parent
-        self.setHeight(65)
+        self.setFixedHeight(65)
+        self.setMinimumWidth(200)
+        self.setMaximumWidth(250)
 
         self.setStyleSheet(RENAMEFIELD)
         self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Fixed)
@@ -238,7 +232,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
         self.hasInputField = False
 
         if uitype == UIType.UI_CHILDRENONLY:
-            width, height = 300, 100
+            width, height = 310, 75
 
             button = StandardButton(self, "Jump to Parent")
             button.clicked.connect(self.clickedJump)
@@ -250,12 +244,10 @@ class LabelConnector(QtGuiWidgets.QWidget):
             button.clicked.connect(self.forceConnect)
             grid.addWidget(button, row_counter, column_counter)
 
-            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
-
         elif uitype == UIType.UI_CONNECTORONLY:
 
             if len(selectedConnectors) == 1:
-                width, height = 450, 75
+                width, height = 465, 75
 
                 button = StandardButton(self, "Rename...")
                 button.clicked.connect(self.setupConnector)
@@ -264,7 +256,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 column_counter += 1
 
             else:
-                width, height = 300, 75
+                width, height = 310, 75
 
             button = StandardButton(self, "Colorize...")
             button.clicked.connect(self.selectColor)
@@ -275,8 +267,6 @@ class LabelConnector(QtGuiWidgets.QWidget):
             button = StandardButton(self, "Select All Children")
             button.clicked.connect(self.selectChildren)
             grid.addWidget(button, row_counter, column_counter)
-
-            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
 
         elif uitype == UIType.UI_COLOR:
 
@@ -297,8 +287,6 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
             self.hasInputField = False
 
-            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
-
         elif uitype == UIType.UI_NAMING:
             self.input = LineEditNaming(self)
 
@@ -310,9 +298,6 @@ class LabelConnector(QtGuiWidgets.QWidget):
                     self.input.selectAll()
 
             width, height = 200, 75
-            self.setFixedHeight(height)
-            self.setMinimumWidth(width)
-            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
 
             grid.addWidget(self.input)
 
@@ -359,12 +344,13 @@ class LabelConnector(QtGuiWidgets.QWidget):
             button.clicked.connect(self.setupConnector)
             grid.addWidget(button, 0, length + 2)
 
-            if grid.rowCount() > 1:
-                width, height = 150, 65
+            if grid.rowCount() == 1:
+                self.setMinimumSize(200, 75)
+                width, height = 195, 75
             else:
-                width, height = (length+1) * 160, grid.rowCount() * 100
+                width, height = (length+1) * 160, grid.rowCount() * 90
 
-            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
 
         offset = QtCore.QPoint(width/2, height/2)
         self.move(QtGui.QCursor.pos() - offset)
