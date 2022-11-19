@@ -145,7 +145,7 @@ class StandardButton(QtGuiWidgets.QPushButton):
         self.setMinimumWidth(100)
         self.setMaximumWidth(150)
 
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Fixed)
 
         self.interfaceColor = color
 
@@ -176,7 +176,7 @@ class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
         self.setMinimumWidth(150)
         self.setMaximumWidth(150)
 
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Fixed, QtGuiWidgets.QSizePolicy.Fixed)
 
         self.itemDelegate = QtGuiWidgets.QStyledItemDelegate(self)
 
@@ -209,9 +209,10 @@ class LineEditNaming(QtGuiWidgets.QLineEdit):
     def __init__(self, parent):
         super(LineEditNaming, self).__init__(parent)
         self.parent = parent
-        self.setMaximumHeight(65)
+        self.setHeight(65)
+
         self.setStyleSheet(RENAMEFIELD)
-        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred, QtGuiWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Fixed)
 
 
 class LabelConnector(QtGuiWidgets.QWidget):
@@ -254,7 +255,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
         elif uitype == UIType.UI_CONNECTORONLY:
 
             if len(selectedConnectors) == 1:
-                width, height = 450, 100
+                width, height = 450, 75
 
                 button = StandardButton(self, "Rename...")
                 button.clicked.connect(self.setupConnector)
@@ -263,7 +264,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 column_counter += 1
 
             else:
-                width, height = 300, 100
+                width, height = 300, 75
 
             button = StandardButton(self, "Colorize...")
             button.clicked.connect(self.selectColor)
@@ -280,7 +281,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
         elif uitype == UIType.UI_COLOR:
 
             length = math.ceil(len(COLORLIST) / 2)
-            width, height = length * 150, 150
+            width, height = length * 160, 175
 
             for color in COLORLIST:
                 button = StandardButton(self, color, COLORLIST[color])
@@ -311,7 +312,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
             width, height = 200, 75
             self.setFixedHeight(height)
             self.setMinimumWidth(width)
-            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Preferred, QtGuiWidgets.QSizePolicy.Preferred)
+            self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
 
             grid.addWidget(self.input)
 
@@ -338,7 +339,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
             if dots:
                 self.input = LineEditConnectSelection(self, dots, node)
-                grid.addWidget(self.input, 1, length+1)
+                grid.addWidget(self.input, 1, length + 2)
 
                 self.input.textEdited.connect(self.updateSearchMatches)
                 self.input.textChanged.connect(self.highlightButtonsMatchingResults)
@@ -346,21 +347,26 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 self.input.completer.popup().pressed.connect(self.lineEnter)
 
                 self.hasInputField = True
-                grid.addWidget(self.input.completer.popup(), 2, length+1,  max(1, grid.rowCount()-2), 1)
+                grid.addWidget(self.input.completer.popup(), 2, length + 2,  max(1, grid.rowCount() - 2), 1)
 
                 if grid.rowCount() < 4:
                     self.input.completer.popup().setMaximumHeight(65)
                     grid.setRowStretch(2, 1)
+                grid.setColumnMinimumWidth(length + 1, 10)
 
             button = StandardButton(
                 self, "Create New\nParent...", BUTTON_REGULARDARK_COLOR)
             button.clicked.connect(self.setupConnector)
-            grid.addWidget(button, 0, length+1)
+            grid.addWidget(button, 0, length + 2)
 
-            width, height = (length) * 160, max(row_counter, 3) * 75
+            if grid.rowCount() > 1:
+                width, height = 150, 65
+            else:
+                width, height = (length+1) * 160, grid.rowCount() * 100
+
             self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
 
-        offset = QtCore.QPoint(width/2, height / 2)
+        offset = QtCore.QPoint(width/2, height/2)
         self.move(QtGui.QCursor.pos() - offset)
 
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
@@ -436,12 +442,20 @@ class LabelConnector(QtGuiWidgets.QWidget):
             return
 
         if self.uiType == UIType.UI_DEFAULT:
-            if event.key() == QtCore.Qt.Key_Shift:
+            if event.key() == QtCore.Qt.Key_Control:
+                self.setupConnector()
+                return
+
+            elif event.key() == QtCore.Qt.Key_Shift:
                 self.shiftPressed = True
 
             elif event.key() == QtCore.Qt.Key_Alt:
                 self.altPressed = True
 
+            elif event.key() in [QtCore.Qt.Key_Up, QtCore.Qt.Key_Down]:
+                self.input.completer.popup().keyPressEvent(event)
+
+            # handle GUI changes for modifier keys
             if event.key() == QtCore.Qt.Key_Shift and not self.altPressed:
                 for button in self.buttons:
                     if button.entered:
@@ -458,9 +472,6 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 for button in self.buttons:
                     button.setTextDefault()
 
-            if event.key() in [QtCore.Qt.Key_Up, QtCore.Qt.Key_Down]:
-                self.input.completer.popup().keyPressEvent(event)
-
     def keyReleaseEvent(self, event):
         """Catch key strokes, also to update highlighting of buttons."""
 
@@ -471,6 +482,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
             elif event.key() == QtCore.Qt.Key_Alt:
                 self.altPressed = False
 
+            # handle GUI changes for modifier keys
             if event.key() == QtCore.Qt.Key_Shift and self.altPressed:
                 for button in self.buttons:
                     if button.entered:
