@@ -17,14 +17,12 @@ import nuke
 import PySide2.QtCore as QtCore
 import PySide2.QtGui as QtGui
 import PySide2.QtWidgets as QtGuiWidgets
-import platform
 import logging
 import math
-
 import fnmatch
 from enum import Enum
 
-_log = logging.getLogger("labelMatcher")
+_log = logging.getLogger("Label Connector")
 
 BUTTON = "border-radius: 5px; font: 13px; padding: 4px 7px;"
 BUTTON_BORDERDEFAULT = "border: 1px solid #212121;"
@@ -41,8 +39,6 @@ CONNECTED_KEY = "Connected"
 
 UNDO = nuke.Undo()
 UNDO_EVENT_TEXT = "Label Connector"
-
-OS = platform.system()
 
 _usePostageStamps = True
 _labelConnectorUI = ""
@@ -61,7 +57,7 @@ COLORLIST = {
     'Default': BUTTON_REGULAR_COLOR
 }
 
-# you can add more Classes that you don't want to connect.
+# you can add more Classes that you don't want to create Connections on.
 # Classes with no Inputs like Reads, Backdrops,... will already be ignored
 IGNORECLASSES = ["Viewer"]
 
@@ -221,6 +217,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
         self.uiType = uitype
         self.shiftPressed = False
         self.altPressed = False
+        self.placed = False
 
         if uitype == UIType.UI_DEFAULT:
             self.buttons = list()
@@ -232,8 +229,6 @@ class LabelConnector(QtGuiWidgets.QWidget):
         self.hasInputField = False
 
         if uitype == UIType.UI_CHILDRENONLY:
-            width, height = 310, 75
-
             button = StandardButton(self, "Jump to Parent")
             button.clicked.connect(self.clickedJump)
             grid.addWidget(button, row_counter, column_counter)
@@ -245,18 +240,13 @@ class LabelConnector(QtGuiWidgets.QWidget):
             grid.addWidget(button, row_counter, column_counter)
 
         elif uitype == UIType.UI_CONNECTORONLY:
-
             if len(selectedConnectors) == 1:
-                width, height = 465, 75
 
                 button = StandardButton(self, "Rename...")
                 button.clicked.connect(self.setupConnector)
                 grid.addWidget(button, row_counter, column_counter)
 
                 column_counter += 1
-
-            else:
-                width, height = 310, 75
 
             button = StandardButton(self, "Colorize...")
             button.clicked.connect(self.selectColor)
@@ -269,21 +259,17 @@ class LabelConnector(QtGuiWidgets.QWidget):
             grid.addWidget(button, row_counter, column_counter)
 
         elif uitype == UIType.UI_COLOR:
-
-            length = math.ceil(len(COLORLIST) / 2)
-            width, height = length * 160, 175
+            length = int(len(COLORLIST) / 2) - 1
 
             for color in COLORLIST:
                 button = StandardButton(self, color, COLORLIST[color])
                 button.clicked.connect(self.setColor)
                 grid.addWidget(button, row_counter, column_counter)
 
-                if column_counter + 1 >= length:
+                column_counter += 1
+                if column_counter > length:
                     row_counter += 1
                     column_counter = 0
-
-                else:
-                    column_counter += 1
 
             self.hasInputField = False
 
@@ -297,16 +283,11 @@ class LabelConnector(QtGuiWidgets.QWidget):
                     self.input.setText(self.textOld)
                     self.input.selectAll()
 
-            width, height = 200, 75
-
             grid.addWidget(self.input)
-
             self.input.returnPressed.connect(self.lineEnter)
-
             self.hasInputField = True
 
         else:  # uitype == UIType.UI_DEFAULT
-
             lenGrid = len(dots)
 
             length = math.ceil(math.sqrt(lenGrid))
@@ -334,26 +315,18 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 self.hasInputField = True
                 grid.addWidget(self.input.completer.popup(), 2, length + 2,  max(1, grid.rowCount() - 2), 1)
 
-                if grid.rowCount() < 4:
+                if grid.rowCount() < 4:  # makes the popup smaller on smaller grids
                     self.input.completer.popup().setMaximumHeight(65)
                     grid.setRowStretch(2, 1)
-                grid.setColumnMinimumWidth(length + 1, 10)
 
-            button = StandardButton(
-                self, "Create New\nParent...", BUTTON_REGULARDARK_COLOR)
+                grid.setColumnMinimumWidth(length + 1, 10)  # adds a little spacer
+
+            # create Parent Button
+            button = StandardButton(self, "Create New\nParent...", BUTTON_REGULARDARK_COLOR)
             button.clicked.connect(self.setupConnector)
             grid.addWidget(button, 0, length + 2)
 
-            if grid.rowCount() == 1:
-                self.setMinimumSize(200, 75)
-                width, height = 195, 75
-            else:
-                width, height = (length+1) * 160, grid.rowCount() * 90
-
         self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
-
-        offset = QtCore.QPoint(width/2, height/2)
-        self.move(QtGui.QCursor.pos() - offset)
 
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
         self.setAttribute(QtCore.Qt.WA_NoSystemBackground)
@@ -363,6 +336,22 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
         if self.hasInputField:
             self.input.setFocus()
+
+    def resizeEvent(self, event):
+        super(LabelConnector, self).resizeEvent(event)
+
+        if not self.placed:  # set position only once in the beginning
+
+            geo = self.frameGeometry()
+            centerTo = QtGui.QCursor.pos()
+
+            if self.uiType == UIType.UI_DEFAULT:  # slight offset here feels better
+                centerTo -= QtCore.QPoint(-int(geo.width()*0.05), int(geo.height()*0.2))
+
+            geo.moveCenter(centerTo)
+            self.move(geo.topLeft())
+
+            self.placed = True
 
     def updateSearchMatches(self):
         """
@@ -704,7 +693,12 @@ def connectNodeToDot(node, dot):
 
 
 def jumpKeepingPreviousSelection(node):
-    """Jump to node without destroyng previous selection of nodes"""
+    """
+    Jump to node without destroyng previous selection of nodes
+
+    Args:
+        node (node): any nuke node
+    """
 
     prevNodes = nuke.selectedNodes()
 
