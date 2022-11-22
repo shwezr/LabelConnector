@@ -9,6 +9,16 @@ editMenu = nuke.menu('Nuke').findItem('Edit')
 editMenu.addCommand('LabelConnector', 'labelConnector.labelConnector(useNoOpNodesOnly=False)', 'A', shortcutContext=2)
 
 """
+UI Shortcuts
+
+Click:          Create connection
+Shift-Click:    Jumps directly to Connector
+Alt-Click:      Opens Connector Settings (same like having the parent selected while hitting the shortcut)
+Ctrl:           Creates Parent (same like the UI button, just to make it faster accessible)
+
+
+Installation:
+
 just add
 
 nuke.pluginAddPath('path_to_this_folder/LabelConnector')

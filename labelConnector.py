@@ -1,13 +1,16 @@
 """
 labelConnector v1.5 - 11/2022
-Lukas Schwabe & Johannes Hezer
-UI based on ChannelHotbox - Falk Hofmann
+Lukas Schwabe, Johannes Hezer
+Big thanks also to Falk Hofmann
 
 Provides context-based UI helpers to setup and navigate Node Connections in Nuke.
 
-Click:          Build connection / Choose option.
-Shift-Click:    Jumps directly to Connector. 
-Alt-Click:      Opens Connector Settings, same like having the parent selected.
+UI Shortcuts
+
+Click:          Create connection
+Shift-Click:    Jumps directly to Connector
+Alt-Click:      Opens Connector Settings (same like having the parent selected while hitting the shortcut)
+Ctrl:           Creates Parent (same like the UI button, just to make it faster accessible)
 
 """
 
@@ -208,7 +211,7 @@ class LineEditNaming(QtGuiWidgets.QLineEdit):
 class LabelConnector(QtGuiWidgets.QWidget):
     """Core LabelConnector UI."""
 
-    def __init__(self, node=None, dots=None, selectedConnectors=None, uitype=UIType.UI_DEFAULT):
+    def __init__(self, node=None, dots=None, selectedConnectors=None, uitype=UIType.UI_DEFAULT, namingText=""):
         super(LabelConnector, self).__init__()
 
         self.node = node
@@ -218,6 +221,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
         self.shiftPressed = False
         self.altPressed = False
         self.placed = False
+        self.textOld = namingText
 
         if uitype == UIType.UI_DEFAULT:
             self.buttons = list()
@@ -276,12 +280,8 @@ class LabelConnector(QtGuiWidgets.QWidget):
         elif uitype == UIType.UI_NAMING:
             self.input = LineEditNaming(self)
 
-            self.textOld = ""
-            if self.node:
-                if isConnector(self.node):
-                    self.textOld = node.knob('label').getValue()
-                    self.input.setText(self.textOld)
-                    self.input.selectAll()
+            self.input.setText(self.textOld)
+            self.input.selectAll()
 
             grid.addWidget(self.input)
             self.input.returnPressed.connect(self.lineEnter)
@@ -338,6 +338,8 @@ class LabelConnector(QtGuiWidgets.QWidget):
             self.input.setFocus()
 
     def resizeEvent(self, event):
+        """Gui size is now known, so lets position it beneath the Mouse Cursor."""
+
         super(LabelConnector, self).resizeEvent(event)
 
         if not self.placed:  # set position only once in the beginning
@@ -345,7 +347,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
             geo = self.frameGeometry()
             centerTo = QtGui.QCursor.pos()
 
-            if self.uiType == UIType.UI_DEFAULT:  # slight offset here feels better
+            if self.uiType == UIType.UI_DEFAULT and self.dots:  # slight offset here feels better
                 centerTo -= QtCore.QPoint(-int(geo.width()*0.05), int(geo.height()*0.2))
 
             geo.moveCenter(centerTo)
@@ -528,7 +530,15 @@ class LabelConnector(QtGuiWidgets.QWidget):
     def setupConnector(self):
         """Click on create or rename Parent"""
         self.close()
-        _showNamingUI(self.node)
+        if self.uiType == UIType.UI_DEFAULT:
+            if self.hasInputField:
+                makeConnector(self.node, self.input.text())
+
+            else:
+                _showNamingUI(self.node)
+
+        elif self.uiType == UIType.UI_CONNECTORONLY:
+            _showNamingUI(self.node, self.node.knob('label').getValue())
 
     def selectColor(self):
         """Click on Color Menu"""
@@ -555,7 +565,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
             if self.input.text():
                 makeConnector(self.node, self.input.text(), self.textOld)
 
-        else:  # uitype == UIType.UI_NAMING
+        else:  # uitype == UIType.UI_DEFAULT
             if self.input.text() == '':
                 self.close()
                 return
@@ -568,7 +578,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
                     break
 
             if not connectDot:
-                for dot in self.dots:
+                for dot in self.dots and self.input.filteredDotNameList:
                     if self.input.filteredDotNameList[0] == dot.knob('label').getValue().upper():
                         connectDot = dot
                         break
@@ -804,14 +814,14 @@ def _showColorSelectionUI(selectedConnectors):
     _labelConnectorUI.show()
 
 
-def _showNamingUI(node):
+def _showNamingUI(node, oldText=""):
     """
     force to show UI with color options
     """
 
     global _labelConnectorUI
 
-    _labelConnectorUI = LabelConnector(node, uitype=UIType.UI_NAMING)
+    _labelConnectorUI = LabelConnector(node, uitype=UIType.UI_NAMING, namingText=oldText)
     _labelConnectorUI.show()
 
 
@@ -849,7 +859,7 @@ def setConnectorDot(dot, txt):
     dot.knob('label').setValue(txt.upper())
 
 
-def makeConnector(node, text, textOld):
+def makeConnector(node, text, textOld=""):
     """
     Creates a new ConnectorDot (a Dot named "Connector..."), 
     or renames an existing selected one alongside all dependent nodes.
