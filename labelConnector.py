@@ -5,12 +5,14 @@ Big thanks also to Falk Hofmann
 
 Provides context-based UI helpers to setup and navigate Node Connections in Nuke.
 
-UI Shortcuts
+UI SHORTCUTS
 
 Click:          Create connection
 Shift-Click:    Jumps directly to Connector
 Alt-Click:      Opens Connector Settings (same like having the parent selected while hitting the shortcut)
 Ctrl:           Creates Parent (same like the UI button, just to make it faster accessible)
+
+SEE INCLUDED MENU.PY FOR DISABLING/ENABLING POSTAGESTAMPS :)
 
 """
 
@@ -96,6 +98,7 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
 
     def enterEvent(self, event):
         """Change name with modifiers when mouse enters button."""
+
         keyModifier = QtGuiWidgets.QApplication.keyboardModifiers()
 
         if keyModifier == QtCore.Qt.ShiftModifier:
@@ -108,6 +111,7 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
 
     def leaveEvent(self, event):
         """Change reset name when mouse leaves button."""
+
         self.setTextDefault()
         self.entered = False
 
@@ -410,6 +414,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
     def keyPressEvent(self, event):
         """Catch key strokes, also to update highlighting of buttons."""
+
         if event.key() == QtCore.Qt.Key_Escape:
             self.close()
             return
@@ -478,6 +483,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
     def clicked(self):
         """Clicking actions based on pressed Modifier Keys"""
+
         keyModifier = QtGuiWidgets.QApplication.keyboardModifiers()
 
         if keyModifier == QtCore.Qt.ShiftModifier:
@@ -500,16 +506,19 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
     def clickedJump(self):
         """Click on Jump To Parent"""
+
         jumpKeepingPreviousSelection(self.node.input(0))
         self.close()
 
     def forceConnect(self):
         """Click on Re-Connect"""
+
         self.close()
         _forceShowUI(self.node, self.dots)
 
     def setColor(self):
         """Click on Color Button"""
+
         color = self.sender().interfaceColor
 
         if color == BUTTON_REGULAR_COLOR:
@@ -529,9 +538,10 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
     def setupConnector(self):
         """Click on create or rename Parent"""
+
         self.close()
         if self.uiType == UIType.UI_DEFAULT:
-            if self.hasInputField:
+            if self.hasInputFieldAndText():
                 makeConnector(self.node, self.input.text())
 
             else:
@@ -540,13 +550,24 @@ class LabelConnector(QtGuiWidgets.QWidget):
         elif self.uiType == UIType.UI_CONNECTORONLY:
             _showNamingUI(self.node, self.node.knob('label').getValue())
 
+    def hasInputFieldAndText(self):
+        """Returns bool if current UI has a textinput and some userinput is provided"""
+
+        if self.hasInputField:
+            if self.input.text().strip(" "):
+                return True
+
+        return False
+
     def selectColor(self):
         """Click on Color Menu"""
+
         self.close()
         _showColorSelectionUI(self.selectedConnectors)
 
     def selectChildren(self):
         """Click on Show all Connections"""
+
         for i in nuke.selectedNodes():
             i.setSelected(False)
 
@@ -558,6 +579,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
     def lineEnter(self):
         """After pressing Enter or Tab"""
+
         if not self.hasInputField:
             return
 
@@ -577,8 +599,8 @@ class LabelConnector(QtGuiWidgets.QWidget):
                     connectDot = dot
                     break
 
-            if not connectDot:
-                for dot in self.dots and self.input.filteredDotNameList:
+            if not connectDot and self.input.filteredDotNameList:
+                for dot in self.dots:
                     if self.input.filteredDotNameList[0] == dot.knob('label').getValue().upper():
                         connectDot = dot
                         break
@@ -609,6 +631,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
     def focusNextPrevChild(self, next):
         """overriding this, to be able to use TAB as ENTER, like the Nuke Node Menu"""
+
         return False
 
 
@@ -761,9 +784,8 @@ def getAllConnectorDots():
 
 
 def getAllConnectorDotsLabels():
-    """
-    returns a list with all currently used labels
-    """
+    """returns a list with all currently used labels"""
+
     connectorDotsLabels = list()
 
     for dot in nuke.allNodes("Dot"):
@@ -774,9 +796,8 @@ def getAllConnectorDotsLabels():
 
 
 def isConnectingAndConnectedCorrectly(node):
-    """
-    returns if the node is connected to the correct parent.
-    """
+    """returns if the node is connected to the correct parent."""
+
     if not node.input(0):
         return False
     return node.knob('label').getValue() == node.input(0).knob('label').getValue() and isConnectingNode(node)
@@ -866,6 +887,9 @@ def makeConnector(node, text, textOld=""):
     """
     text = text.strip(" ").upper()
 
+    if not text:
+        return
+
     if text in getAllConnectorDotsLabels():
         nuke.message("Label already in use")
         return
@@ -882,7 +906,6 @@ def makeConnector(node, text, textOld=""):
                         x['label'].setValue(text)
 
             else:
-
                 setConnectorDot(node, text)
 
         else:  # attach new ConnectorDot Node to any Node

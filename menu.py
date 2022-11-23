@@ -4,12 +4,14 @@ import labelConnector
 
 editMenu = nuke.menu('Nuke').findItem('Edit')
 
-# change your shortcut here, default = 'A'. 
-# If you never want PostageStamps, but NoOps forever and ever, change to useNoOpNodesOnly=True
-editMenu.addCommand('LabelConnector', 'labelConnector.labelConnector(useNoOpNodesOnly=False)', 'A', shortcutContext=2)
+"""
+change your shortcut here, default is 'A'. 
+If you want PostageStamps instead of NoOp-Nodes when possible, change to useNoOpNodesOnly=False
+"""
+editMenu.addCommand('LabelConnector', 'labelConnector.labelConnector(useNoOpNodesOnly=True)', 'A', shortcutContext=2)
 
 """
-UI Shortcuts
+UI SHORTCUTS
 
 Click:          Create connection
 Shift-Click:    Jumps directly to Connector
@@ -17,7 +19,7 @@ Alt-Click:      Opens Connector Settings (same like having the parent selected w
 Ctrl:           Creates Parent (same like the UI button, just to make it faster accessible)
 
 
-Installation:
+INSTALLATION
 
 just add
 
