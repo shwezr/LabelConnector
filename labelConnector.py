@@ -16,7 +16,7 @@ SEE INCLUDED MENU.PY FOR DISABLING/ENABLING POSTAGESTAMPS :)
 
 """
 
-__version__ = 1.5
+__version__ = 1.51
 
 import nuke
 import PySide2.QtCore as QtCore
@@ -197,6 +197,14 @@ class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
     def updateCompleterList(self):
         self.completer.model().setStringList(self.filteredDotNameList)
 
+    def keyPressEvent(self, event):
+        """Catches the Select All shortcut, so the ctrl hit won't trigger as Create Parent."""
+
+        if self.parent().ctrlPressed and event.key() == QtCore.Qt.Key_A:
+            self.parent().ignoreCtrlRelease = True
+
+        super(LineEditConnectSelection, self).keyPressEvent(event)
+
 
 class LineEditNaming(QtGuiWidgets.QLineEdit):
     """Custom QLineEdit with different style."""
@@ -223,7 +231,9 @@ class LabelConnector(QtGuiWidgets.QWidget):
         self.dots = dots
         self.uiType = uitype
         self.shiftPressed = False
+        self.ctrlPressed = False
         self.altPressed = False
+        self.ignoreCtrlRelease = False
         self.placed = False
         self.textOld = namingText
 
@@ -361,7 +371,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
     def updateSearchMatches(self):
         """
-        Searches for matches, filling the list for the completer as well as the highlighting. 
+        Searches for matches, filling the list for the completer as well as the highlighting.
         This won't update when stepping through the completer list via up/down arrow keys.
         """
 
@@ -425,8 +435,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
         if self.uiType == UIType.UI_DEFAULT:
             if event.key() == QtCore.Qt.Key_Control:
-                self.setupConnector()
-                return
+                self.ctrlPressed = True
 
             elif event.key() == QtCore.Qt.Key_Shift:
                 self.shiftPressed = True
@@ -458,7 +467,16 @@ class LabelConnector(QtGuiWidgets.QWidget):
         """Catch key strokes, also to update highlighting of buttons."""
 
         if self.uiType == UIType.UI_DEFAULT:
-            if event.key() == QtCore.Qt.Key_Shift:
+            if event.key() == QtCore.Qt.Key_Control:
+                self.ctrlPressed = False
+
+                if self.ignoreCtrlRelease:
+                    self.ignoreCtrlRelease = False
+                else:
+                    self.setupConnector()
+                return
+
+            elif event.key() == QtCore.Qt.Key_Shift:
                 self.shiftPressed = False
 
             elif event.key() == QtCore.Qt.Key_Alt:
