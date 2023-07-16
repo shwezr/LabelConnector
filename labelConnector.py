@@ -25,7 +25,6 @@ import PySide2.QtWidgets as QtGuiWidgets
 import logging
 import math
 import fnmatch
-from enum import Enum
 
 _log = logging.getLogger("Label Connector")
 
@@ -67,7 +66,7 @@ COLORLIST = {
 IGNORECLASSES = ["Viewer"]
 
 
-class UIType(Enum):
+class UIType():
     UI_DEFAULT = 1
     UI_CONNECTORONLY = 2
     UI_CHILDRENONLY = 3
