@@ -1,5 +1,5 @@
 """
-labelConnector v1.5 - 11/2022
+labelConnector v1.6 - 01/2025
 Lukas Schwabe, Johannes Hezer
 Big thanks also to Falk Hofmann
 
@@ -16,12 +16,19 @@ SEE INCLUDED MENU.PY FOR DISABLING/ENABLING POSTAGESTAMPS :)
 
 """
 
-__version__ = 1.51
+__version__ = 1.6
 
 import nuke
-import PySide2.QtCore as QtCore
-import PySide2.QtGui as QtGui
-import PySide2.QtWidgets as QtGuiWidgets
+
+if nuke.NUKE_VERSION_MAJOR < 16:
+    import PySide2.QtCore as QtCore
+    import PySide2.QtGui as QtGui
+    import PySide2.QtWidgets as QtGuiWidgets
+else:
+    import PySide6.QtCore as QtCore
+    import PySide6.QtGui as QtGui
+    import PySide6.QtWidgets as QtGuiWidgets
+
 import logging
 import math
 import fnmatch
@@ -44,21 +51,21 @@ CONNECTED_KEY = "Connected"
 UNDO = nuke.Undo()
 UNDO_EVENT_TEXT = "Label Connector"
 
-_usePostageStamps = True
-_labelConnectorUI = ""
+_usePostageStamps = False
+_labelConnectorUI = None
 
 
-COLORLIST = {
-    'Red': 1277436927,
-    'Orange': 2017657087,
-    'Yellow': 2154504703,
-    'Green': 793519103,
-    'Dark Green': 304619007,
-    'Cyan': 592071935,
-    'Blue': 556482559,
-    'Dark Blue': 320482047,
-    'Purple': 975388415,
-    'Default': BUTTON_REGULAR_COLOR
+COLOR_LIST = {
+    "Red": 1277436927,
+    "Orange": 2017657087,
+    "Yellow": 2154504703,
+    "Green": 793519103,
+    "Dark Green": 304619007,
+    "Cyan": 592071935,
+    "Blue": 556482559,
+    "Dark Blue": 320482047,
+    "Purple": 975388415,
+    "Default": BUTTON_REGULAR_COLOR,
 }
 
 # you can add more Classes that you don't want to create Connections on.
@@ -66,7 +73,7 @@ COLORLIST = {
 IGNORECLASSES = ["Viewer"]
 
 
-class UIType():
+class UIType:
     UI_DEFAULT = 1
     UI_CONNECTORONLY = 2
     UI_CHILDRENONLY = 3
@@ -77,10 +84,12 @@ class UIType():
 class ConnectorButton(QtGuiWidgets.QPushButton):
     """Custom QPushButton to change colors when hovering above."""
 
+    rightClicked = QtCore.Signal()
+
     def __init__(self, parent, dot, node):
         super(ConnectorButton, self).__init__(parent)
         self.setMouseTracking(True)
-        self.label = dot.knob('label').getValue()
+        self.label = dot.knob("label").getValue()
         self.dot = dot
         self.node = node
         self.entered = False
@@ -114,6 +123,13 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
         self.setTextDefault()
         self.entered = False
 
+    def mousePressEvent(self, event):
+        """Emits a signal when right clicked."""
+
+        if event.button() == QtCore.Qt.RightButton:
+            self.rightClicked.emit()
+        super(ConnectorButton, self).mousePressEvent(event)
+
     def setTextJump(self):
         self.setText("Jump to\n-\n" + self.label)
 
@@ -124,12 +140,16 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
         self.setText(self.label)
 
     def setStyleHighlighted(self):
-        self.setStyleSheet("QPushButton{background-color:" + self.color + ";" + BUTTON + BUTTON_BORDERHIGHLIGHT + "} " +
-                           "QPushButton:hover{background-color:" + self.highlight + ";" + BUTTON + BUTTON_BORDERHIGHLIGHT + "}")
+        self.setStyleSheet(
+            f"QPushButton{{background-color:{self.color};{BUTTON}{BUTTON_BORDERHIGHLIGHT}}} "
+            f"QPushButton:hover{{background-color:{self.highlight};{BUTTON}{BUTTON_BORDERHIGHLIGHT}}}"
+        )
 
     def setStyleDefault(self):
-        self.setStyleSheet("QPushButton{background-color:" + self.color + ";" + BUTTON + BUTTON_BORDERDEFAULT + "} " +
-                           "QPushButton:hover{background-color:" + self.highlight + ";" + BUTTON + BUTTON_BORDERDEFAULT + "}")
+        self.setStyleSheet(
+            f"QPushButton{{background-color:{self.color};{BUTTON}{BUTTON_BORDERDEFAULT}}} "
+            f"QPushButton:hover{{background-color:{self.highlight};{BUTTON}{BUTTON_BORDERDEFAULT}}}"
+        )
 
 
 class StandardButton(QtGuiWidgets.QPushButton):
@@ -149,8 +169,7 @@ class StandardButton(QtGuiWidgets.QPushButton):
 
         self.color = rgb2hex(interface2rgb(color))
         self.highlight = rgb2hex(interface2rgb(BUTTON_HIGHLIGHT_COLOR))
-        self.setStyleSheet("QPushButton{background-color:" + self.color + ";" + BUTTON + "} " +
-                           "QPushButton:hover{background-color:" + self.highlight + ";" + BUTTON + "}")
+        self.setStyleSheet(f"QPushButton{{background-color:{self.color};{BUTTON}}} QPushButton:hover{{background-color:{self.highlight};{BUTTON}}}")
 
 
 class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
@@ -165,7 +184,7 @@ class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
 
         self.dotNameList = []
         for dot in dots:
-            self.dotNameList.append(dot.knob('label').getValue())
+            self.dotNameList.append(dot.knob("label").getValue())
 
         self.filteredDotNameList = []
 
@@ -222,7 +241,14 @@ class LineEditNaming(QtGuiWidgets.QLineEdit):
 class LabelConnector(QtGuiWidgets.QWidget):
     """Core LabelConnector UI."""
 
-    def __init__(self, node=None, dots=None, selectedConnectors=None, uitype=UIType.UI_DEFAULT, namingText=""):
+    def __init__(
+        self,
+        node=None,
+        dots=None,
+        selectedConnectors=None,
+        uitype=UIType.UI_DEFAULT,
+        namingText="",
+    ):
         super(LabelConnector, self).__init__()
 
         self.node = node
@@ -233,8 +259,19 @@ class LabelConnector(QtGuiWidgets.QWidget):
         self.ctrlPressed = False
         self.altPressed = False
         self.ignoreCtrlRelease = False
-        self.placed = False
+        self.centered_ui = False
         self.textOld = namingText
+
+        try:  # we have to try this in case no viewer exists or no active input is used
+            self.current_viewed_node = nuke.activeViewer().node().input(nuke.activeViewer().activeInput())
+        except Exception:
+            self.current_viewed_node = None
+
+        try:
+            self.active_viewer_input = nuke.activeViewer().activeInput()  # returns None if nothing is connected
+        except Exception:
+            # if there was no input, we set it to 1 (which equals to Num2 in Nuke, to avoid the first input)
+            self.active_viewer_input = 1
 
         if uitype == UIType.UI_DEFAULT:
             self.buttons = list()
@@ -258,7 +295,6 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
         elif uitype == UIType.UI_CONNECTORONLY:
             if len(selectedConnectors) == 1:
-
                 button = StandardButton(self, "Rename...")
                 button.clicked.connect(self.setupConnector)
                 grid.addWidget(button, row_counter, column_counter)
@@ -276,10 +312,10 @@ class LabelConnector(QtGuiWidgets.QWidget):
             grid.addWidget(button, row_counter, column_counter)
 
         elif uitype == UIType.UI_COLOR:
-            length = int(len(COLORLIST) / 2) - 1
+            length = int(len(COLOR_LIST) / 2) - 1
 
-            for color in COLORLIST:
-                button = StandardButton(self, color, COLORLIST[color])
+            for color in COLOR_LIST:
+                button = StandardButton(self, color, COLOR_LIST[color])
                 button.clicked.connect(self.setColor)
                 grid.addWidget(button, row_counter, column_counter)
 
@@ -307,7 +343,9 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
             for dot in dots:
                 button = ConnectorButton(self, dot, node)
-                button.clicked.connect(self.clicked)
+                button.clicked.connect(self.connector_button_left_clicked)
+                button.rightClicked.connect(self.connector_button_right_clicked)
+
                 grid.addWidget(button, row_counter, column_counter)
                 self.buttons.append(button)
 
@@ -326,7 +364,13 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 self.input.completer.popup().pressed.connect(self.lineEnter)
 
                 self.hasInputField = True
-                grid.addWidget(self.input.completer.popup(), 2, length + 2,  max(1, grid.rowCount() - 2), 1)
+                grid.addWidget(
+                    self.input.completer.popup(),
+                    2,
+                    length + 2,
+                    max(1, grid.rowCount() - 2),
+                    1,
+                )
 
                 if grid.rowCount() < 4:  # makes the popup smaller on smaller grids
                     self.input.completer.popup().setMaximumHeight(65)
@@ -355,18 +399,17 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
         super(LabelConnector, self).resizeEvent(event)
 
-        if not self.placed:  # set position only once in the beginning
-
+        if not self.centered_ui:  # set position only once in the beginning
             geo = self.frameGeometry()
             centerTo = QtGui.QCursor.pos()
 
             if self.uiType == UIType.UI_DEFAULT and self.dots:  # slight offset here feels better
-                centerTo -= QtCore.QPoint(-int(geo.width()*0.05), int(geo.height()*0.2))
+                centerTo -= QtCore.QPoint(-int(geo.width() * 0.05), int(geo.height() * 0.2))
 
             geo.moveCenter(centerTo)
             self.move(geo.topLeft())
 
-            self.placed = True
+            self.centered_ui = True
 
     def updateSearchMatches(self):
         """
@@ -380,8 +423,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
         self.highlightButtons = []
 
         if inputText:
-
-            query = '*' + '*'.join([inputText[j:j+1] for j in range(len(inputText))]) + '*'
+            query = "*" + "*".join([inputText[j : j + 1] for j in range(len(inputText))]) + "*"
 
             tempListUnsorted = []
 
@@ -498,7 +540,9 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 for button in self.buttons:
                     button.setTextDefault()
 
-    def clicked(self):
+    QtCore.Slot()
+
+    def connector_button_left_clicked(self):
         """Clicking actions based on pressed Modifier Keys"""
 
         keyModifier = QtGuiWidgets.QApplication.keyboardModifiers()
@@ -521,6 +565,24 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
         self.close()
 
+    QtCore.Slot()
+
+    def connector_button_right_clicked(self):
+        """Set Viewer Input to the clicked Anchor."""
+
+        try:
+            if nuke.activeViewer().node().input(self.active_viewer_input) == self.sender().dot:
+                nuke.activeViewer().node().setInput(self.active_viewer_input, self.current_viewed_node)
+            else:
+                nuke.activeViewer().node().setInput(self.active_viewer_input, self.sender().dot)
+                nuke.activeViewer().activateInput(self.active_viewer_input)
+
+            self.changed_viewed_node = True
+
+        except Exception as e:
+            nuke.tprint("Error setting Viewer Input: ", e)
+            pass
+
     def clickedJump(self):
         """Click on Jump To Parent"""
 
@@ -539,15 +601,15 @@ class LabelConnector(QtGuiWidgets.QWidget):
         color = self.sender().interfaceColor
 
         if color == BUTTON_REGULAR_COLOR:
-            color = nuke.defaultNodeColor('Dot')
+            color = nuke.defaultNodeColor("Dot")
 
         UNDO.begin(UNDO_EVENT_TEXT)
 
         if self.selectedConnectors:
             for node in self.selectedConnectors:
-                node.knob('tile_color').setValue(color)
+                node.knob("tile_color").setValue(color)
         else:
-            self.node.knob('tile_color').setValue(color)
+            self.node.knob("tile_color").setValue(color)
 
         UNDO.end()
 
@@ -565,7 +627,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 _showNamingUI(self.node)
 
         elif self.uiType == UIType.UI_CONNECTORONLY:
-            _showNamingUI(self.node, self.node.knob('label').getValue())
+            _showNamingUI(self.node, self.node.knob("label").getValue())
 
     def hasInputFieldAndText(self):
         """Returns bool if current UI has a textinput and some userinput is provided"""
@@ -605,20 +667,20 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 makeConnector(self.node, self.input.text(), self.textOld)
 
         else:  # uitype == UIType.UI_DEFAULT
-            if self.input.text() == '':
+            if self.input.text() == "":
                 self.close()
                 return
 
-            connectDot = ''
+            connectDot = ""
 
             for dot in self.dots:
-                if self.input.text().upper() == dot.knob('label').getValue().upper():
+                if self.input.text().upper() == dot.knob("label").getValue().upper():
                     connectDot = dot
                     break
 
             if not connectDot and self.input.filteredDotNameList:
                 for dot in self.dots:
-                    if self.input.filteredDotNameList[0] == dot.knob('label').getValue().upper():
+                    if self.input.filteredDotNameList[0] == dot.knob("label").getValue().upper():
                         connectDot = dot
                         break
 
@@ -640,7 +702,10 @@ class LabelConnector(QtGuiWidgets.QWidget):
         self.close()
 
     def eventFilter(self, object, event):
-        if object == self and event.type() in [QtCore.QEvent.WindowDeactivate, QtCore.QEvent.FocusOut]:
+        if object == self and event.type() in [
+            QtCore.QEvent.WindowDeactivate,
+            QtCore.QEvent.FocusOut,
+        ]:
             self.close()
             return True
 
@@ -650,6 +715,18 @@ class LabelConnector(QtGuiWidgets.QWidget):
         """overriding this, to be able to use TAB as ENTER, like the Nuke Node Menu"""
 
         return False
+
+    def close(self):
+        """Close the UI, reset the viewer to original state if it was altered."""
+
+        try:
+            # if viewer input was changed, we set it back to the original input
+            if self.changed_viewed_node:
+                nuke.activeViewer().node().setInput(self.active_viewer_input, self.current_viewed_node)
+        except Exception:
+            pass
+
+        super(LabelConnector, self).close()
 
 
 def createConnectingNodeAndConnect(dot, node=None):
@@ -701,8 +778,7 @@ def createConnectingNodeAndConnect(dot, node=None):
         return
 
     if node and not connectorGiven:
-        connectingNode.setXpos(
-            (node.xpos() + int(node.screenWidth()/2)) - int(connectingNode.screenWidth()/2))
+        connectingNode.setXpos((node.xpos() + int(node.screenWidth() / 2)) - int(connectingNode.screenWidth() / 2))
         if connectingNode.Class() == "NoOp":
             offset = 50
         else:
@@ -715,8 +791,8 @@ def createConnectingNodeAndConnect(dot, node=None):
             return
 
     connectingNode.setName(CONNECTED_KEY)
-    connectingNode.knob('label').setValue(dot['label'].getValue())
-    connectingNode.knob('tile_color').setValue(rgb2interface((80, 80, 80)))
+    connectingNode.knob("label").setValue(dot["label"].getValue())
+    connectingNode.knob("tile_color").setValue(rgb2interface((80, 80, 80)))
     connectingNode.knob("hide_input").setValue(True)
 
     UNDO.end()
@@ -778,25 +854,22 @@ def getAllConnectorDots():
 
     for dot in nuke.allNodes("Dot"):
         if isConnector(dot) and dot["label"].value():
-
             # check if ConnectorDot Label has already been used
             if not dot["label"].value() in compareList:
                 connectorDots.append(dot)
                 compareList.append(dot["label"].value())
             else:
-                _log.error("Double Label Entry found on Connector Dots, skipping dot: {} '{}' ".format(
-                    dot.name(), dot["label"].value()))
+                _log.error("Double Label Entry found on Connector Dots, skipping dot: {} '{}' ".format(dot.name(), dot["label"].value()))
                 doubleEntries = True
                 doubleEntriesList.append(dot)
 
     if doubleEntries:
-        message = 'Skipped following Connector Dots (Label already used): \n \n'
+        message = "Skipped following Connector Dots (Label already used): \n \n"
         for doubleDot in doubleEntriesList:
-            message += "{} '{}' \n".format(doubleDot.name(),
-                                           doubleDot["label"].value())
+            message += "{} '{}' \n".format(doubleDot.name(), doubleDot["label"].value())
         nuke.message(message)
 
-    connectorDots.sort(key=lambda dot: dot.knob('label').value())
+    connectorDots.sort(key=lambda dot: dot.knob("label").value())
     return connectorDots
 
 
@@ -817,7 +890,7 @@ def isConnectingAndConnectedCorrectly(node):
 
     if not node.input(0):
         return False
-    return node.knob('label').getValue() == node.input(0).knob('label').getValue() and isConnectingNode(node)
+    return node.knob("label").getValue() == node.input(0).knob("label").getValue() and isConnectingNode(node)
 
 
 def isConnector(node):
@@ -848,7 +921,10 @@ def _showColorSelectionUI(selectedConnectors):
     global _labelConnectorUI
 
     _labelConnectorUI = LabelConnector(
-        selectedConnectors[0], selectedConnectors=selectedConnectors, uitype=UIType.UI_COLOR)
+        selectedConnectors[0],
+        selectedConnectors=selectedConnectors,
+        uitype=UIType.UI_COLOR,
+    )
     _labelConnectorUI.show()
 
 
@@ -870,8 +946,7 @@ def _showConnectorUI(node):
 
     global _labelConnectorUI
 
-    _labelConnectorUI = LabelConnector(node, selectedConnectors=[
-                                       node], uitype=UIType.UI_CONNECTORONLY)
+    _labelConnectorUI = LabelConnector(node, selectedConnectors=[node], uitype=UIType.UI_CONNECTORONLY)
     _labelConnectorUI.show()
 
 
@@ -893,13 +968,13 @@ def setConnectorDot(dot, txt):
         txt (str): desired label text
     """
     dot.setName(CONNECTOR_KEY)
-    dot.knob('note_font_size').setValue(22)
-    dot.knob('label').setValue(txt.upper())
+    dot.knob("note_font_size").setValue(22)
+    dot.knob("label").setValue(txt.upper())
 
 
 def makeConnector(node, text, textOld=""):
     """
-    Creates a new ConnectorDot (a Dot named "Connector..."), 
+    Creates a new ConnectorDot (a Dot named "Connector..."),
     or renames an existing selected one alongside all dependent nodes.
     """
     text = text.strip(" ").upper()
@@ -917,10 +992,10 @@ def makeConnector(node, text, textOld=""):
         if node.Class() == "Dot":
             if isConnector(node):
                 # rename existing ConnectorDot alongside dependent Nodes
-                node['label'].setValue(text)
+                node["label"].setValue(text)
                 for x in node.dependent(nuke.INPUTS | nuke.HIDDEN_INPUTS, forceEvaluate=False):
-                    if x['label'].getValue() == textOld:
-                        x['label'].setValue(text)
+                    if x["label"].getValue() == textOld:
+                        x["label"].setValue(text)
 
             else:
                 setConnectorDot(node, text)
@@ -928,7 +1003,7 @@ def makeConnector(node, text, textOld=""):
         else:  # attach new ConnectorDot Node to any Node
             node = nuke.createNode("Dot", inpanel=False)
             setConnectorDot(node, text)
-            node.setYpos(node.ypos()+50)
+            node.setYpos(node.ypos() + 50)
 
     else:  # create new independent ConnectorDot
         node = nuke.createNode("Dot", inpanel=False)
@@ -964,7 +1039,7 @@ def rgb2interface(rgb):
     if len(rgb) == 3:
         rgb = rgb + (255,)
 
-    return int('%02x%02x%02x%02x' % rgb, 16)
+    return int("%02x%02x%02x%02x" % rgb, 16)
 
 
 def getTileColor(node=None):
@@ -979,7 +1054,7 @@ def getTileColor(node=None):
         [type]: [description]
     """
     node = node or nuke.selectedNode()
-    interfaceColor = node.knob('tile_color').value()
+    interfaceColor = node.knob("tile_color").value()
 
     if interfaceColor == 0 or interfaceColor == nuke.defaultNodeColor(node.Class()) or interfaceColor == 3435973632:
         interfaceColor = BUTTON_REGULAR_COLOR
@@ -994,12 +1069,16 @@ def rgb2hex(rgbaValues):
     Args:
         rgbaValues ([type]): [description]
 
-    Returns:
+    Returns:O
         [type]: [description]
     """
     if len(rgbaValues) < 3:
         return
-    return '#%02x%02x%02x' % (int(rgbaValues[0]*255), int(rgbaValues[1]*255), int(rgbaValues[2]*255))
+    return "#%02x%02x%02x" % (
+        int(rgbaValues[0] * 255),
+        int(rgbaValues[1] * 255),
+        int(rgbaValues[2] * 255),
+    )
 
 
 def hex2rgb(hexColor):
@@ -1012,18 +1091,14 @@ def hex2rgb(hexColor):
     Returns:
         [type]: [description]
     """
-    hexColor = hexColor.lstrip('#')
-    return tuple(int(hexColor[i:i+2], 16) for i in (0, 2, 4))
+    hexColor = hexColor.lstrip("#")
+    return tuple(int(hexColor[i : i + 2], 16) for i in (0, 2, 4))
 
 
-def labelConnector(useNoOpNodesOnly=True):
+def labelConnector():
     """
     Entry function. Determines, which UI to open based on context.
     """
-
-    if useNoOpNodesOnly:
-        global _usePostageStamps
-        _usePostageStamps = False
 
     connectedSth = False
     onlyConnectorDotsSelected = True
@@ -1049,18 +1124,15 @@ def labelConnector(useNoOpNodesOnly=True):
     global _labelConnectorUI
 
     if nodes:
-
         node = nodes[0]
 
         if onlyConnectorDotsSelected:
-            _labelConnectorUI = LabelConnector(
-                node, selectedConnectors=nodes, uitype=UIType.UI_CONNECTORONLY)
+            _labelConnectorUI = LabelConnector(node, selectedConnectors=nodes, uitype=UIType.UI_CONNECTORONLY)
             _labelConnectorUI.show()
             return
 
         if isConnectingAndConnectedCorrectly(node):
-            _labelConnectorUI = LabelConnector(
-                node, connectorDots, uitype=UIType.UI_CHILDRENONLY)
+            _labelConnectorUI = LabelConnector(node, connectorDots, uitype=UIType.UI_CHILDRENONLY)
             _labelConnectorUI.show()
             return
 

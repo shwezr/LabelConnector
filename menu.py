@@ -2,13 +2,12 @@ import nuke
 import labelConnector
 
 
-editMenu = nuke.menu('Nuke').findItem('Edit')
+editMenu = nuke.menu("Nuke").findItem("Edit")
 
 """
 change your shortcut here, default is 'A'. 
-If you want PostageStamps instead of NoOp-Nodes when possible, change to useNoOpNodesOnly=False
 """
-editMenu.addCommand('LabelConnector', 'labelConnector.labelConnector(useNoOpNodesOnly=True)', 'A', shortcutContext=2)
+editMenu.addCommand("Label Connector", "labelConnector.labelConnector()", "A", shortcutContext=2)
 
 """
 UI SHORTCUTS
