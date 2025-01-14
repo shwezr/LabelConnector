@@ -32,15 +32,19 @@ else:
 import logging
 import math
 import fnmatch
+import textwrap
+
 
 _log = logging.getLogger("Label Connector")
 
 BUTTON = "border-radius: 5px; font: 13px; padding: 4px 7px;"
-BUTTON_BORDERDEFAULT = "border: 1px solid #212121;"
-BUTTON_BORDERHIGHLIGHT = "border: 1px solid #AAAAAA;"
+BUTTON_BORDER_DEFAULT = "border: 1px solid #212121;"
+BUTTON_BORDER_HIGHLIGHT = "border: 1px solid #AAAAAA;"
+BUTTON_BORDER_SELECTED = "border: 1px solid #C6710C;"
 BUTTON_REGULAR_COLOR = 673720575
 BUTTON_REGULARDARK_COLOR = 471802623
 BUTTON_HIGHLIGHT_COLOR = 3329297663
+
 
 SEARCHFIELD = "border-radius: 5px; font: 13px; border: 1px solid #212121;"
 RENAMEFIELD = "border-radius: 5px; font: 13px; border: 1px solid #212121;"
@@ -50,6 +54,11 @@ CONNECTED_KEY = "Connected"
 
 UNDO = nuke.Undo()
 UNDO_EVENT_TEXT = "Label Connector"
+
+MAX_CHARS_CONNECTOR_BUTTONS = 16  # linebreak after this amount of characters
+# CONNECTORMINIMUMHEIGHT = 500  # UI minimun height in px
+CONNECTORMINIMUMWIDTH = 500  # UI minimun height in px
+
 
 _usePostageStamps = False
 _labelConnectorUI = None
@@ -90,11 +99,18 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
         super(ConnectorButton, self).__init__(parent)
         self.setMouseTracking(True)
         self.label = dot.knob("label").getValue()
+        self.wrapped_label = "\n".join(textwrap.wrap(self.label, width=MAX_CHARS_CONNECTOR_BUTTONS))
         self.dot = dot
         self.node = node
         self.entered = False
+        self.selected = False
+        self.is_highlighted = False  # stores highlight state in case of being selected, to revert correctly
+
         self.color = rgb2hex(interface2rgb(getTileColor(dot)))
         self.highlight = rgb2hex(interface2rgb(BUTTON_HIGHLIGHT_COLOR))
+        self.highlighted_style = f"QPushButton{{background-color:{self.color};{BUTTON}{BUTTON_BORDER_HIGHLIGHT}}} QPushButton:hover{{background-color:{self.highlight};{BUTTON}{BUTTON_BORDER_HIGHLIGHT}}}"
+        self.default_style = f"QPushButton{{background-color:{self.color};{BUTTON}{BUTTON_BORDER_DEFAULT}}} QPushButton:hover{{background-color:{self.highlight};{BUTTON}{BUTTON_BORDER_DEFAULT}}}"
+        self.selected_style = f"QPushButton{{background-color:{self.color};{BUTTON}{BUTTON_BORDER_SELECTED}}} QPushButton:hover{{background-color:{self.highlight};{BUTTON}{BUTTON_BORDER_SELECTED}}}"
 
         self.setTextDefault()
         self.setStyleDefault()
@@ -110,10 +126,13 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
         keyModifier = QtGuiWidgets.QApplication.keyboardModifiers()
 
         if keyModifier == QtCore.Qt.ShiftModifier:
-            self.setTextJump()
+            self.setTextSelect()
 
         elif keyModifier == QtCore.Qt.AltModifier:
             self.setTextModify()
+
+        elif keyModifier == QtCore.Qt.ControlModifier:
+            self.setTextJumpConnector()
 
         self.entered = True
 
@@ -130,26 +149,38 @@ class ConnectorButton(QtGuiWidgets.QPushButton):
             self.rightClicked.emit()
         super(ConnectorButton, self).mousePressEvent(event)
 
-    def setTextJump(self):
-        self.setText("Jump to\n-\n" + self.label)
+    # Texts for different states
+
+    def setTextJumpConnector(self):
+        self.setText("Jump to Connector\n-\n" + self.wrapped_label)
 
     def setTextModify(self):
-        self.setText("Options...\n-\n" + self.label)
+        self.setText("Options...\n-\n" + self.wrapped_label)
+
+    def setTextSelect(self):
+        self.setText("Create multiple\n-\n" + self.wrapped_label)
 
     def setTextDefault(self):
-        self.setText(self.label)
+        self.setText(self.wrapped_label)
+
+    # Styles for different states
 
     def setStyleHighlighted(self):
-        self.setStyleSheet(
-            f"QPushButton{{background-color:{self.color};{BUTTON}{BUTTON_BORDERHIGHLIGHT}}} "
-            f"QPushButton:hover{{background-color:{self.highlight};{BUTTON}{BUTTON_BORDERHIGHLIGHT}}}"
-        )
+        """In case of a search pattern match."""
+
+        self.setStyleSheet(self.highlighted_style)
+        self.is_highlighted = True
 
     def setStyleDefault(self):
-        self.setStyleSheet(
-            f"QPushButton{{background-color:{self.color};{BUTTON}{BUTTON_BORDERDEFAULT}}} "
-            f"QPushButton:hover{{background-color:{self.highlight};{BUTTON}{BUTTON_BORDERDEFAULT}}}"
-        )
+        """Default style."""
+
+        self.setStyleSheet(self.default_style)
+        self.is_highlighted = False
+
+    def setStyleSelected(self):
+        """In case of being selected to create multiple stamps."""
+
+        self.setStyleSheet(self.selected_style)
 
 
 class StandardButton(QtGuiWidgets.QPushButton):
@@ -215,14 +246,6 @@ class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
     def updateCompleterList(self):
         self.completer.model().setStringList(self.filteredDotNameList)
 
-    def keyPressEvent(self, event):
-        """Catches the Select All shortcut, so the ctrl hit won't trigger as Create Parent."""
-
-        if self.parent().ctrlPressed and event.key() == QtCore.Qt.Key_A:
-            self.parent().ignoreCtrlRelease = True
-
-        super(LineEditConnectSelection, self).keyPressEvent(event)
-
 
 class LineEditNaming(QtGuiWidgets.QLineEdit):
     """Custom QLineEdit with different style."""
@@ -258,7 +281,6 @@ class LabelConnector(QtGuiWidgets.QWidget):
         self.shiftPressed = False
         self.ctrlPressed = False
         self.altPressed = False
-        self.ignoreCtrlRelease = False
         self.centered_ui = False
         self.textOld = namingText
 
@@ -271,13 +293,32 @@ class LabelConnector(QtGuiWidgets.QWidget):
             self.active_viewer_input = nuke.activeViewer().activeInput()  # returns None if nothing is connected
         except Exception:
             # if there was no input, we set it to 1 (which equals to Num2 in Nuke, to avoid the first input)
+            self.active_viewer_input = None
+
+        if self.active_viewer_input is None:
             self.active_viewer_input = 1
 
         if uitype == UIType.UI_DEFAULT:
             self.buttons = list()
+            self.clicked_connectors_list = list()
 
-        grid = QtGuiWidgets.QGridLayout()
-        self.setLayout(grid)
+        # add a main widget in between to have transparent background
+
+        self.main_widget = QtGuiWidgets.QWidget()
+        self.main_widget.setObjectName("label_connector_widget")
+        self.main_widget.setStyleSheet("QWidget#label_connector_widget{background-color: rgba(45, 45, 45, 0.9);}")
+
+        self.main_layout = QtGuiWidgets.QVBoxLayout()
+        self.main_layout.addWidget(self.main_widget)
+        self.setLayout(self.main_layout)
+
+        self.content_layout = QtGuiWidgets.QVBoxLayout()
+        self.main_widget.setLayout(self.content_layout)
+
+        button_grid = QtGuiWidgets.QGridLayout()
+        self.content_layout.addLayout(button_grid)
+
+        # populate the UI based on the UIType
 
         column_counter, row_counter = 0, 0
         self.hasInputField = False
@@ -285,31 +326,31 @@ class LabelConnector(QtGuiWidgets.QWidget):
         if uitype == UIType.UI_CHILDRENONLY:
             button = StandardButton(self, "Jump to Parent")
             button.clicked.connect(self.clickedJump)
-            grid.addWidget(button, row_counter, column_counter)
+            button_grid.addWidget(button, row_counter, column_counter)
 
             column_counter += 1
 
             button = StandardButton(self, "Re-Connect to...")
             button.clicked.connect(self.forceConnect)
-            grid.addWidget(button, row_counter, column_counter)
+            button_grid.addWidget(button, row_counter, column_counter)
 
         elif uitype == UIType.UI_CONNECTORONLY:
             if len(selectedConnectors) == 1:
                 button = StandardButton(self, "Rename...")
                 button.clicked.connect(self.setupConnector)
-                grid.addWidget(button, row_counter, column_counter)
+                button_grid.addWidget(button, row_counter, column_counter)
 
                 column_counter += 1
 
             button = StandardButton(self, "Colorize...")
             button.clicked.connect(self.selectColor)
-            grid.addWidget(button, row_counter, column_counter)
+            button_grid.addWidget(button, row_counter, column_counter)
 
             column_counter += 1
 
             button = StandardButton(self, "Select All Children")
             button.clicked.connect(self.selectChildren)
-            grid.addWidget(button, row_counter, column_counter)
+            button_grid.addWidget(button, row_counter, column_counter)
 
         elif uitype == UIType.UI_COLOR:
             length = int(len(COLOR_LIST) / 2) - 1
@@ -317,7 +358,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
             for color in COLOR_LIST:
                 button = StandardButton(self, color, COLOR_LIST[color])
                 button.clicked.connect(self.setColor)
-                grid.addWidget(button, row_counter, column_counter)
+                button_grid.addWidget(button, row_counter, column_counter)
 
                 column_counter += 1
                 if column_counter > length:
@@ -327,12 +368,23 @@ class LabelConnector(QtGuiWidgets.QWidget):
             self.hasInputField = False
 
         elif uitype == UIType.UI_NAMING:
+            self.title = QtGuiWidgets.QLabel(self)
+
+            if self.textOld:
+                self.title.setText("Rename Connector")
+            else:
+                self.title.setText("Create New Connector")
+
+            self.title.setStyleSheet("color: #AAAAAA; font: 13px; margin-top: 10px;")
+            self.title.setAlignment(QtCore.Qt.AlignLeft)
+            button_grid.addWidget(self.title, 0, 0)
+
             self.input = LineEditNaming(self)
 
             self.input.setText(self.textOld)
             self.input.selectAll()
 
-            grid.addWidget(self.input)
+            button_grid.addWidget(self.input, 1, 0)
             self.input.returnPressed.connect(self.lineEnter)
             self.hasInputField = True
 
@@ -346,7 +398,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 button.clicked.connect(self.connector_button_left_clicked)
                 button.rightClicked.connect(self.connector_button_right_clicked)
 
-                grid.addWidget(button, row_counter, column_counter)
+                button_grid.addWidget(button, row_counter, column_counter)
                 self.buttons.append(button)
 
                 column_counter += 1
@@ -356,7 +408,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
             if dots:
                 self.input = LineEditConnectSelection(self, dots, node)
-                grid.addWidget(self.input, 1, length + 2)
+                button_grid.addWidget(self.input, 1, length + 2)
 
                 self.input.textEdited.connect(self.updateSearchMatches)
                 self.input.textChanged.connect(self.highlightButtonsMatchingResults)
@@ -364,29 +416,38 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 self.input.completer.popup().pressed.connect(self.lineEnter)
 
                 self.hasInputField = True
-                grid.addWidget(
+                button_grid.addWidget(
                     self.input.completer.popup(),
                     2,
                     length + 2,
-                    max(1, grid.rowCount() - 2),
+                    max(1, button_grid.rowCount() - 2),
                     1,
                 )
 
-                if grid.rowCount() < 4:  # makes the popup smaller on smaller grids
+                if button_grid.rowCount() < 4:  # makes the popup smaller on smaller grids
                     self.input.completer.popup().setMaximumHeight(65)
-                    grid.setRowStretch(2, 1)
+                    button_grid.setRowStretch(2, 1)
 
-                grid.setColumnMinimumWidth(length + 1, 10)  # adds a little spacer
+                button_grid.setColumnMinimumWidth(length + 1, 10)  # adds a little spacer
 
             # create Parent Button
             button = StandardButton(self, "Create New\nParent...", BUTTON_REGULARDARK_COLOR)
             button.clicked.connect(self.setupConnector)
-            grid.addWidget(button, 0, length + 2)
+            button_grid.addWidget(button, 0, length + 2)
+
+            # explanation label at the bottom
+            explanation_label = QtGuiWidgets.QLabel(self)
+            explanation_label.setText("shift - multiple | alt - colorize | ctrl - jump to connector | right-click - preview")
+            explanation_label.setStyleSheet("color: #AAAAAA; font: 10px; margin-top: 10px;")
+            explanation_label.setWordWrap(True)
+            explanation_label.setAlignment(QtCore.Qt.AlignCenter)
+
+            self.content_layout.addWidget(explanation_label)
 
         self.setSizePolicy(QtGuiWidgets.QSizePolicy.Expanding, QtGuiWidgets.QSizePolicy.Expanding)
 
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
-        self.setAttribute(QtCore.Qt.WA_NoSystemBackground)
+        # self.setAttribute(QtCore.Qt.WA_NoSystemBackground)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
 
         self.installEventFilter(self)
@@ -397,11 +458,24 @@ class LabelConnector(QtGuiWidgets.QWidget):
     def resizeEvent(self, event):
         """Gui size is now known, so lets position it beneath the Mouse Cursor."""
 
+        # the setMinimumHeight method seems to do weird stuff, so lest just do it manually
+
+        if self.uiType == UIType.UI_DEFAULT:
+            # if event.size().height() < CONNECTORMINIMUMHEIGHT:
+            #     self.resize(event.size().width(), CONNECTORMINIMUMHEIGHT)
+
+            if event.size().width() < CONNECTORMINIMUMWIDTH:
+                self.resize(CONNECTORMINIMUMWIDTH, event.size().height())
+
         super(LabelConnector, self).resizeEvent(event)
 
         if not self.centered_ui:  # set position only once in the beginning
             geo = self.frameGeometry()
-            centerTo = QtGui.QCursor.pos()
+
+            if self.uiType == UIType.UI_DEFAULT:
+                centerTo = QtGui.QGuiApplication.screenAt(QtGui.QCursor.pos()).geometry().center()
+            else:
+                centerTo = QtGui.QCursor.pos()
 
             if self.uiType == UIType.UI_DEFAULT and self.dots:  # slight offset here feels better
                 centerTo -= QtCore.QPoint(-int(geo.width() * 0.05), int(geo.height() * 0.2))
@@ -488,21 +562,8 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 self.input.completer.popup().keyPressEvent(event)
 
             # handle GUI changes for modifier keys
-            if event.key() == QtCore.Qt.Key_Shift and not self.altPressed:
-                for button in self.buttons:
-                    if button.entered:
-                        button.setTextJump()
-                        break
-
-            elif event.key() == QtCore.Qt.Key_Alt and not self.shiftPressed:
-                for button in self.buttons:
-                    if button.entered:
-                        button.setTextModify()
-                        break
-
-            elif event.key() in [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Shift]:
-                for button in self.buttons:
-                    button.setTextDefault()
+            if event.key() in [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Shift, QtCore.Qt.Key_Control]:
+                self.update_connector_button_text()
 
     def keyReleaseEvent(self, event):
         """Catch key strokes, also to update highlighting of buttons."""
@@ -511,34 +572,68 @@ class LabelConnector(QtGuiWidgets.QWidget):
             if event.key() == QtCore.Qt.Key_Control:
                 self.ctrlPressed = False
 
-                if self.ignoreCtrlRelease:
-                    self.ignoreCtrlRelease = False
-                else:
-                    self.setupConnector()
-                return
-
             elif event.key() == QtCore.Qt.Key_Shift:
                 self.shiftPressed = False
+
+                if self.clicked_connectors_list:
+                    self.create_multiple_connectors()
+                    self.close()
 
             elif event.key() == QtCore.Qt.Key_Alt:
                 self.altPressed = False
 
             # handle GUI changes for modifier keys
-            if event.key() == QtCore.Qt.Key_Shift and self.altPressed:
-                for button in self.buttons:
-                    if button.entered:
-                        button.setTextModify()
-                        break
+            if event.key() in [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Shift, QtCore.Qt.Key_Control]:
+                self.update_connector_button_text()
 
-            elif event.key() == QtCore.Qt.Key_Alt and self.shiftPressed:
-                for button in self.buttons:
-                    if button.entered:
-                        button.setTextJump()
-                        break
+    def update_connector_button_text(self):
+        """Set connector button text based on pressed Modifier Keys."""
 
-            elif event.key() in [QtCore.Qt.Key_Alt, QtCore.Qt.Key_Shift]:
-                for button in self.buttons:
-                    button.setTextDefault()
+        if self.shiftPressed and not (self.altPressed or self.ctrlPressed):
+            for button in self.buttons:
+                if button.entered:
+                    button.setTextSelect()
+                    break
+
+        elif self.altPressed and not (self.shiftPressed or self.ctrlPressed):
+            for button in self.buttons:
+                if button.entered:
+                    button.setTextModify()
+                    break
+
+        elif self.ctrlPressed and not (self.shiftPressed or self.altPressed):
+            for button in self.buttons:
+                if button.entered:
+                    button.setTextJumpConnector()
+                    break
+
+        else:
+            for button in self.buttons:
+                button.setTextDefault()
+
+    def create_multiple_connectors(self):
+        """Create multiple connectors based on selected buttons."""
+
+        if not self.clicked_connectors_list:
+            return
+        UNDO.begin(UNDO_EVENT_TEXT)
+
+        created_nodes = []
+        for clicked_button in self.clicked_connectors_list:
+            n = createConnectingNodeAndConnect(clicked_button.dot)
+            created_nodes.append(n)
+
+        xPosFirst = created_nodes[0].xpos()
+        yPosFirst = created_nodes[0].ypos()
+
+        for i, node in enumerate(created_nodes):
+            node.setXpos(xPosFirst + 120 * i)
+            node.setYpos(yPosFirst)
+            node.setSelected(True)
+
+        self.clicked_connectors_list = []
+
+        UNDO.end()
 
     QtCore.Slot()
 
@@ -547,28 +642,35 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
         keyModifier = QtGuiWidgets.QApplication.keyboardModifiers()
 
-        if keyModifier == QtCore.Qt.ShiftModifier:
+        if keyModifier == QtCore.Qt.ControlModifier:
             jumpKeepingPreviousSelection(self.sender().dot)
-            self.close()
 
         elif keyModifier == QtCore.Qt.AltModifier:
             _showConnectorUI(self.sender().dot)
+            self.close()
+
+        elif keyModifier == QtCore.Qt.ShiftModifier:
+            clicked_button = self.sender()
+            if clicked_button not in self.clicked_connectors_list:
+                self.clicked_connectors_list.append(clicked_button)
+                clicked_button.setStyleSelected()
+            else:
+                self.clicked_connectors_list.remove(clicked_button)
+                if clicked_button.is_highlighted:
+                    clicked_button.setStyleHighlighted()
+                else:
+                    clicked_button.setStyleDefault()
 
         else:
             UNDO.begin(UNDO_EVENT_TEXT)
-            if self.node:
-                createConnectingNodeAndConnect(self.sender().dot, self.node)
-            else:
-                createConnectingNodeAndConnect(self.sender().dot)
-
+            createConnectingNodeAndConnect(self.sender().dot, self.node)
             UNDO.end()
-
-        self.close()
+            self.close()
 
     QtCore.Slot()
 
     def connector_button_right_clicked(self):
-        """Set Viewer Input to the clicked Anchor."""
+        """Set Viewer Input to the clicked Connector."""
 
         try:
             if nuke.activeViewer().node().input(self.active_viewer_input) == self.sender().dot:
@@ -580,7 +682,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
             self.changed_viewed_node = True
 
         except Exception as e:
-            nuke.tprint("Error setting Viewer Input: ", e)
+            # nuke.tprint("Error setting Viewer Input: ", e)
             pass
 
     def clickedJump(self):
@@ -603,7 +705,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
         if color == BUTTON_REGULAR_COLOR:
             color = nuke.defaultNodeColor("Dot")
 
-        UNDO.begin(UNDO_EVENT_TEXT)
+        UNDO.begin("Colorize Connector")
 
         if self.selectedConnectors:
             for node in self.selectedConnectors:
@@ -687,25 +789,31 @@ class LabelConnector(QtGuiWidgets.QWidget):
             if connectDot:
                 keyModifier = QtGuiWidgets.QApplication.keyboardModifiers()
 
-                if keyModifier == QtCore.Qt.ShiftModifier:
+                if keyModifier == QtCore.Qt.ControlModifier:
                     jumpKeepingPreviousSelection(connectDot)
 
                 else:
                     UNDO.begin(UNDO_EVENT_TEXT)
-                    # create destination Node if none exists yet
-                    if self.node:
-                        createConnectingNodeAndConnect(connectDot, self.node)
-                    else:
-                        createConnectingNodeAndConnect(connectDot)
+                    createConnectingNodeAndConnect(connectDot, self.node)
                     UNDO.end()
 
         self.close()
+
+    def mousePressEvent(self, event):
+        """Close if there was a left click within the UIs geo, but no Button was triggered."""
+
+        if event.button() == QtCore.Qt.LeftButton:
+            self.create_multiple_connectors()
+            self.close()
 
     def eventFilter(self, object, event):
         if object == self and event.type() in [
             QtCore.QEvent.WindowDeactivate,
             QtCore.QEvent.FocusOut,
         ]:
+            if self.uiType == UIType.UI_DEFAULT:
+                self.create_multiple_connectors()
+
             self.close()
             return True
 
@@ -741,8 +849,6 @@ def createConnectingNodeAndConnect(dot, node=None):
         node: New Node to be connected
     """
 
-    UNDO.begin(UNDO_EVENT_TEXT)
-
     nodeClass = "PostageStamp"
 
     global _usePostageStamps
@@ -774,7 +880,6 @@ def createConnectingNodeAndConnect(dot, node=None):
         connectNodeToDot(connectingNode, dot)
 
     elif not connectSuccess and _usePostageStamps and connectorGiven:
-        UNDO.end()
         return
 
     if node and not connectorGiven:
@@ -787,7 +892,6 @@ def createConnectingNodeAndConnect(dot, node=None):
 
         if not node.setInput(0, connectingNode):
             nuke.delete(connectingNode)
-            UNDO.end()
             return
 
     connectingNode.setName(CONNECTED_KEY)
@@ -795,7 +899,7 @@ def createConnectingNodeAndConnect(dot, node=None):
     connectingNode.knob("tile_color").setValue(rgb2interface((80, 80, 80)))
     connectingNode.knob("hide_input").setValue(True)
 
-    UNDO.end()
+    return connectingNode
 
 
 def connectNodeToDot(node, dot):
