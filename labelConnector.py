@@ -7,12 +7,10 @@ Provides context-based UI helpers to setup and navigate Node Connections in Nuke
 
 UI SHORTCUTS
 
-Click:          Create connection
-Shift-Click:    Jumps directly to Connector
+Click:          Create Connection
+Ctrl-Click:     Jumps directly to Connector
 Alt-Click:      Opens Connector Settings (same like having the parent selected while hitting the shortcut)
-Ctrl:           Creates Parent (same like the UI button, just to make it faster accessible)
-
-SEE INCLUDED MENU.PY FOR DISABLING/ENABLING POSTAGESTAMPS :)
+Right-Click:    Preview Connection
 
 """
 
@@ -56,7 +54,6 @@ UNDO = nuke.Undo()
 UNDO_EVENT_TEXT = "Label Connector"
 
 MAX_CHARS_CONNECTOR_BUTTONS = 16  # linebreak after this amount of characters
-# CONNECTORMINIMUMHEIGHT = 500  # UI minimun height in px
 CONNECTORMINIMUMWIDTH = 500  # UI minimun height in px
 
 
@@ -437,7 +434,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
 
             # explanation label at the bottom
             explanation_label = QtGuiWidgets.QLabel(self)
-            explanation_label.setText("shift - multiple | alt - colorize | ctrl - jump to connector | right-click - preview")
+            explanation_label.setText("shift - multiple | alt - options | ctrl - jump to connector | right-click - preview")
             explanation_label.setStyleSheet("color: #AAAAAA; font: 10px; margin-top: 10px;")
             explanation_label.setWordWrap(True)
             explanation_label.setAlignment(QtCore.Qt.AlignCenter)
@@ -461,9 +458,6 @@ class LabelConnector(QtGuiWidgets.QWidget):
         # the setMinimumHeight method seems to do weird stuff, so lest just do it manually
 
         if self.uiType == UIType.UI_DEFAULT:
-            # if event.size().height() < CONNECTORMINIMUMHEIGHT:
-            #     self.resize(event.size().width(), CONNECTORMINIMUMHEIGHT)
-
             if event.size().width() < CONNECTORMINIMUMWIDTH:
                 self.resize(CONNECTORMINIMUMWIDTH, event.size().height())
 
