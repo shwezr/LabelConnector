@@ -831,6 +831,32 @@ class LabelConnector(QtGuiWidgets.QWidget):
         super(LabelConnector, self).close()
 
 
+def addConnectingNodeButtons(node):
+    """
+    Adds "jump to source" and "open source settings" buttons to a node.
+    """
+
+    tab = nuke.Tab_Knob("connected", "Connected")
+    node.addKnob(tab)
+
+    jump_button = nuke.PyScript_Knob("jumpToSource", "Jump to Source")
+    jump_button.setCommand(
+        "n = nuke.thisNode()\n"
+        "input = n.input(0)\n"
+        "\n"
+        "if input is not None:\n"
+        "    prevNodes = nuke.selectedNodes()\n"
+        "    for i in prevNodes:\n"
+        "        i.setSelected(False)\n"
+        "    input.setSelected(True)\n"
+        "    nuke.zoomToFitSelected()\n"
+        "    input.setSelected(False)\n"
+        "    for i in prevNodes:\n"
+        "        i.setSelected(True)\n"
+    )
+    node.addKnob(jump_button)
+
+
 def createConnectingNodeAndConnect(dot, node=None):
     """
     Creates a to-be-connected Node based on 2D or 3D/Deep type node tree
@@ -892,6 +918,7 @@ def createConnectingNodeAndConnect(dot, node=None):
     connectingNode.knob("label").setValue(dot["label"].getValue())
     connectingNode.knob("tile_color").setValue(rgb2interface((80, 80, 80)))
     connectingNode.knob("hide_input").setValue(True)
+    addConnectingNodeButtons(connectingNode)
 
     return connectingNode
 
@@ -1070,6 +1097,24 @@ def setConnectorDot(dot, txt):
     dot.knob("label").setValue(txt.upper())
 
 
+def addConnectorNodeButtons(node):
+    """Adds "Select all Children" button to a node."""
+
+    tab = nuke.Tab_Knob("connector", "Connector")
+    node.addKnob(tab)
+
+    select_button = nuke.PyScript_Knob("selectChildren", "Select all Children")
+    select_button.setCommand(
+        "n = nuke.thisNode()\n"
+        "for i in nuke.selectedNodes():\n"
+        "    i.setSelected(False)\n"
+        "\n"
+        "for x in n.dependent(nuke.INPUTS | nuke.HIDDEN_INPUTS, forceEvaluate=False):\n"
+        "    x.setSelected(True)\n"
+    )
+    node.addKnob(select_button)
+
+
 def makeConnector(node, text, textOld=""):
     """
     Creates a new ConnectorDot (a Dot named "Connector..."),
@@ -1102,10 +1147,12 @@ def makeConnector(node, text, textOld=""):
             node = nuke.createNode("Dot", inpanel=False)
             setConnectorDot(node, text)
             node.setYpos(node.ypos() + 50)
+            addConnectorNodeButtons(node)
 
     else:  # create new independent ConnectorDot
         node = nuke.createNode("Dot", inpanel=False)
         setConnectorDot(node, text)
+        addConnectorNodeButtons(node)
 
     UNDO.end()
 
