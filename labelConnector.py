@@ -517,7 +517,8 @@ class LabelConnector(QtGuiWidgets.QWidget):
             for button in self.buttons:
                 if fnmatch.fnmatch(button.text(), query):
                     self.highlightButtons.append(button)
-                    tempListUnsorted.append(button.text())
+                    if button.text() not in tempListUnsorted:
+                        tempListUnsorted.append(button.text())
 
             for n in list(tempListUnsorted):
                 if n.startswith(inputText):
@@ -1048,11 +1049,13 @@ def getAllConnectors():
 
     # keep compatibility with older versions, so we also search for dots
     all_dots = [node for node in nuke.allNodes("Dot") if node["label"].value() and isConnector(node)]
-    all_postage_stamps = [
-        node for node in nuke.allNodes("PostageStamp") if node.knob("disable").value() is False and node.knob("label").value() and isConnector(node)
-    ]
+    # all_postage_stamps = [
+    #     node for node in nuke.allNodes("PostageStamp") if node.knob("disable").value() is False and node.knob("label").value() and isConnector(node)
+    # ]
 
-    all_connectors = all_dots + all_postage_stamps
+    all_noops = [node for node in nuke.allNodes("NoOp") if node["label"].value() and isConnector(node)]
+
+    all_connectors = all_dots + all_noops
 
     # for connector in all_connectors:
     # check if ConnectorDot Label has already been used
@@ -1080,11 +1083,13 @@ def getAllConnectorLabels():
     # keep compatibility with older versions, so we also search for dots
 
     all_dots = [node for node in nuke.allNodes("Dot") if node["label"].value() and isConnector(node)]
-    all_postage_stamps = [
-        node for node in nuke.allNodes("PostageStamp") if node.knob("disable").value() is False and node.knob("label").value() and isConnector(node)
-    ]
+    # all_postage_stamps = [
+    #     node for node in nuke.allNodes("PostageStamp") if node.knob("disable").value() is False and node.knob("label").value() and isConnector(node)
+    # ]
 
-    all_connectors = all_dots + all_postage_stamps
+    all_noops = [node for node in nuke.allNodes("NoOp") if node["label"].value() and isConnector(node)]
+
+    all_connectors = all_dots + all_noops
 
     connector_dot_labels = [connector["label"].value() for connector in all_connectors]
 
@@ -1176,7 +1181,7 @@ def setConnectorSettings(connector, txt):
     connector.setName(CONNECTOR_KEY)
     # connector.knob("note_font_size").setValue(22)
     connector.knob("label").setValue(txt.upper())
-    connector.knob("postage_stamp").setValue(False)
+    # connector.knob("postage_stamp").setValue(False)
 
     if BOLD_LABELS:
         current_font = connector.knob("note_font").value()
@@ -1203,8 +1208,7 @@ def addConnectorNodeButtons(node):
 
 def makeConnector(node, text, textOld=""):
     """
-    Creates a new ConnectorDot (a Dot named "Connector..."),
-    or renames an existing selected one alongside all dependent nodes.
+    Creates a new Connector, or renames an existing selected one alongside all dependent nodes.
     """
     text = text.strip(" ").upper()
 
@@ -1218,25 +1222,21 @@ def makeConnector(node, text, textOld=""):
     UNDO.begin(UNDO_EVENT_TEXT)
 
     if node:
-        if node.Class() == "Dot" or node.Class() == "PostageStamp":
-            if isConnector(node):
-                # rename existing ConnectorDot alongside dependent Nodes
-                node["label"].setValue(text)
-                for x in node.dependent(nuke.INPUTS | nuke.HIDDEN_INPUTS, forceEvaluate=False):
-                    if x["label"].getValue() == textOld:
-                        x["label"].setValue(text)
-
-            else:
-                setConnectorSettings(node, text)
+        if (node.Class() == "Dot" or node.Class() == "NoOp") and isConnector(node):
+            # rename existing ConnectorDot alongside dependent Nodes
+            node["label"].setValue(text)
+            for x in node.dependent(nuke.INPUTS | nuke.HIDDEN_INPUTS, forceEvaluate=False):
+                if x["label"].getValue() == textOld:
+                    x["label"].setValue(text)
 
         else:  # attach new ConnectorDot Node to any Node
-            node = nuke.createNode("PostageStamp", inpanel=False)
+            node = nuke.createNode("NoOp", inpanel=False)
             setConnectorSettings(node, text)
             node.setYpos(node.ypos() + 50)
             addConnectorNodeButtons(node)
 
     else:  # create new independent ConnectorDot
-        node = nuke.createNode("PostageStamp", inpanel=False)
+        node = nuke.createNode("NoOp", inpanel=False)
         setConnectorSettings(node, text)
         addConnectorNodeButtons(node)
 
