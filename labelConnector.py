@@ -339,7 +339,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
         elif uitype == UIType.UI_CONNECTORONLY:
             len_selected_equals_one = len(selectedConnectors) == 1
 
-            self.clicked_connectors_list = nuke.selectedNodes()
+            self.clicked_connectors_list = selectedConnectors
 
             new_btn = StandardButton(self, "create Connected")
             new_btn.clicked.connect(self.make_connectors_btn_clicked)
