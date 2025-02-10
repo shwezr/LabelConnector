@@ -981,30 +981,58 @@ class LabelConnector(QtGuiWidgets.QWidget):
         super(LabelConnector, self).close()
 
 
-def addConnectingNodeButtons(node):
+# def store_connector_name_on_node(node, connector):
+#     """
+#     Store the connector name on the node as a knob.
+
+#     Args:
+#         node (node): Nuke Node
+#         connector (node): Connector Node
+#     """
+
+#     if not node.knob("connectorName"):
+#         knob = nuke.String_Knob("connectorName", "Connector Name")
+#         knob.setValue(connector.name())
+#         knob.setVisible(False)
+#         node.addKnob(knob)
+#     else:
+#         node.knob("connectorName").setValue(connector.name())
+
+
+def addConnectingNodeButtons(connecting, connector):
     """
     Adds "jump to source" and "open source settings" buttons to a node.
     """
 
-    tab = nuke.Tab_Knob("connected", "Connected")
-    node.addKnob(tab)
+    if not connecting.knob("connected"):
+        tab = nuke.Tab_Knob("connected", "Connected")
+        connecting.addKnob(tab)
 
-    jump_button = nuke.PyScript_Knob("jumpToSource", "Jump to Source")
-    jump_button.setCommand(
-        "n = nuke.thisNode()\n"
-        "input = n.input(0)\n"
-        "\n"
-        "if input is not None:\n"
-        "    prevNodes = nuke.selectedNodes()\n"
-        "    for i in prevNodes:\n"
-        "        i.setSelected(False)\n"
-        "    input.setSelected(True)\n"
-        "    nuke.zoomToFitSelected()\n"
-        "    input.setSelected(False)\n"
-        "    for i in prevNodes:\n"
-        "        i.setSelected(True)\n"
-    )
-    node.addKnob(jump_button)
+    if not connecting.knob("jumpToSource"):
+        jump_button = nuke.PyScript_Knob("jumpToSource", "Jump to Source")
+        jump_button.setCommand(
+            "n = nuke.thisNode()\n"
+            "input = n.input(0)\n"
+            "\n"
+            "if input:\n"
+            "    prevNodes = nuke.selectedNodes()\n"
+            "    for i in prevNodes:\n"
+            "        i.setSelected(False)\n"
+            "    input.setSelected(True)\n"
+            "    nuke.zoomToFitSelected()\n"
+            "    input.setSelected(False)\n"
+            "    for i in prevNodes:\n"
+            "        i.setSelected(True)\n"
+        )
+        connecting.addKnob(jump_button)
+
+    if not connecting.knob("connectorName"):
+        knob = nuke.String_Knob("connectorName", "Connector Name")
+        knob.setValue(connector.name())
+        knob.setVisible(False)
+        connecting.addKnob(knob)
+    else:
+        connecting.knob("connectorName").setValue(connector.name())
 
 
 def createConnectingNodeAndConnect(connector, node=None):
@@ -1074,27 +1102,35 @@ def createConnectingNodeAndConnect(connector, node=None):
         if color not in [BUTTON_REGULAR_COLOR, 0]:
             connectingNode.knob("tile_color").setValue(color)
 
-    addConnectingNodeButtons(connectingNode)
+    addConnectingNodeButtons(connectingNode, connector)
 
     return connectingNode
 
 
-def connectNodeToDot(node, dot):
+def connectNodeToDot(node, connector):
     """
-    Connects a connecting-Node to a ConnectorDot
+    Connects a connecting-Node to a Connector
 
     Args:
         node (node): any nuke node
-        dot (node): ConnectorDot
+        dot (node): Connector
 
     Returns:
         bool: True if new node connection was successful
     """
 
     UNDO.begin(UNDO_EVENT_TEXT)
-    if node.setInput(0, dot):
+    if node.setInput(0, connector):
+        if COLORIZE_CONNECTED:
+            color = connector.knob("tile_color").value()
+            if color not in [BUTTON_REGULAR_COLOR, 0]:
+                node.knob("tile_color").setValue(color)
+            else:
+                node.knob("tile_color").setValue(CONNECTOR_DEFAULT_COLOR)
+
         UNDO.end()
         return True
+
     UNDO.end()
     return False
 
@@ -1122,10 +1158,10 @@ def jumpKeepingPreviousSelection(node):
 
 def getAllConnectors():
     """
-    get all ConnectorDots with a valid label, warn if there are double entries found.
+    get all Connectors with a valid label, warn if there are double entries found.
 
     Returns:
-        list: list containing all connectorDots
+        list: list containing all connectors
     """
 
     # filtered_connectors = list()
@@ -1308,7 +1344,7 @@ def makeConnector(node, text, textOld=""):
     UNDO.begin(UNDO_EVENT_TEXT)
 
     if node:
-        if (node.Class() == "Dot" or node.Class() == "NoOp") and isConnector(node):
+        if node.Class() in ["Dot", "NoOp"] and isConnector(node):
             # rename existing ConnectorDot alongside dependent Nodes
             node["label"].setValue(text)
             for x in node.dependent(nuke.INPUTS | nuke.HIDDEN_INPUTS, forceEvaluate=False):
@@ -1426,6 +1462,14 @@ def labelConnector():
         if not isConnector(node):
             onlyConnectorsSelected = False
             if node["label"].value() and not isConnectingAndConnectedCorrectly(node):
+                if node.knob("connectorName"):
+                    connectorName = node.knob("connectorName").value()
+                    connector = nuke.toNode(connectorName)
+                    if connector:
+                        if connectNodeToDot(node, connector):
+                            connectedSth = True
+                        continue
+
                 for connector in all_connectors:
                     if node["label"].value() == connector["label"].value():
                         # Label Match has been found, try to connect the two Nodes

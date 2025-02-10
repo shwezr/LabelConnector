@@ -20,25 +20,25 @@ https://youtu.be/KIwTWMKP2u0
 ### Shortcuts
 In the UI you can
 
-**SHIFT + CLICK:** Jumps directly to Connector.\
-**ALT + CLICK:** Opens Connector Settings, same like having a Parent selected.\
-**CTRL:** Creates parent (same like clicking the "Create Parent"-button)
+**CTRL + CLICK:** Jumps directly to Connector.\
+**ALT + CLICK:** Opens Connector Settings, same like having a Connector selected.\
+**SHIFT + CLICK:** Create multiple connections.\
+**RIGHT-CLICK:** Preview Connector with Viewer (resets on exit).
 
 ### Quick Tips / FAQ
 - after Copy-Pasting Nodes, they are all still selected. Hit the Shortcut right away to connect them all.
 - you can always select all Nodes in the DAG, and hit the Shortcut to connect everything that might got loose.
 - searching works like Nukes Node Menu, just hit some characters. E.g. searching "ce" will give you "CRYPTO ENV".
 - Arrow Up/Down navigates search results. Hitting Enter/Tab always selects the first one, no need to arrow down.
-- fastest way to create a new Parent is typing the desired name directly into the search bar. Hitting "Create Parent" (or CTRL) gives the new Parent right away.
+- fastest way to create a new Parent is typing the desired name directly into the search bar. Hitting "Create Parent" gives the new Connector right away.
 - Copy-Pasting and connecting works across multiple scripts, as long as the Parents have the same Label.
 - give your Parents some colors. It works with multiple Parents selected at once.
 - the given colors are just some quick-use presets. You can choose any color you want for your Parent, or built your own selection using the one and only amazing W_HotBox.
 - creating Parents with a Node selected will append the new Node. Dots will get converted.
 - creating Childrens with a Node selected will prepend a new NoOp/PostageStamp to make the connection.
 - label any Dots like you want, they won't get shown in the Label Connector. Parents have a Name starting "Connector.." to identify them.
-- the UI is context-based. Just give it a try, to hit the shortcut with Parents or Childrens selected, or use the Shortcuts mentioned above to get even faster.
-- avoid duplicate Parents with the same Label.
-- creates only NoOp Nodes by default, way better performance in big scripts :). If you want PostageStamps, easily change it in the included menu.py.
+- the UI is context-based. Just give it a try, to hit the shortcut with Parents or Childrens selected.
+- creates only NoOp Nodes by default, recommended for better performance. If you want PostageStamps, change it in the included menu.py.
 
 ## Installation
 To install the plugin, just add
@@ -87,6 +87,8 @@ Anything changed, just rename. It renames every Child accordingly.
 Having a Node selected will prepend a Children to build the connection. Just search for it, if it is on top, hit Enter/Tab. 
 
 ## Version History
+
+- v1.6: support for duplicate labels, right-click-preview, and more UI improvements, colorize option, switched to NoOps for all nodes for readability (replaced Dots as Connector).
 
 - v1.5: SHIFT+CLICK jumps. ALT+CLICK modifies Parent. CTRL creates New Parent. Search results get highlighted. More flexible search results, now with single character matching. NoOp-Nodes are default now.
 
