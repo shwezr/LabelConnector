@@ -6,6 +6,10 @@ https://youtu.be/KIwTWMKP2u0
 
 ![LabelConnector](./.pictures/LabelConnectorMain.png)
 
+## Stamps
+
+There is a  big difference to Stamps, that this oen here doesn't use any callbacks and is none-intrusive, leaving no reffered code on Nodes that will cause issues in other pipelines or with other artists. There is a version of this UI compatible with Stamps, if you use Stamps in your pipeline here: [LabelConnector for Stamps](https://github.com/luckyspacetraveller/Stamps)
+
 
 ## Quick Manual
 
