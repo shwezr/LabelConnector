@@ -1,7 +1,3 @@
-# DISCLAIMER
-There is a more recent and further development of this plugin, that merges best of both worlds of the glorious Stamps and this tool.
-https://github.com/luckyspacetraveller/Stamps
-
 # Label Connector
 A Connector Tool for Nuke with a handy UI. Super light-weight and very easy to use, just one single shortcut to create, setup, colorize and navigate these connections from anywhere in the Node Graph. No Callbacks, no external code references on nodes, to always stay compatible to other pipelines, or artists not having the Label Connector.
 
