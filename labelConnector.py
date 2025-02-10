@@ -205,6 +205,69 @@ class StandardButton(QtGuiWidgets.QPushButton):
         self.setStyleSheet(f"QPushButton{{background-color:{self.color};{BUTTON}}} QPushButton:hover{{background-color:{self.highlight};{BUTTON}}}")
 
 
+class ConnectorListModel(QtCore.QStringListModel):
+    """Class to extend the QAbstractListModel to store the Connector full name in the model."""
+
+    ConnectorRole = QtCore.Qt.UserRole + 1
+
+    def __init__(self, data, parent=None):
+        """Class to extend the QAbstractListModel to store the Connector node in the model.
+
+        Args:
+            data (dict): Dict containing {"name": "connector_title", "connector": "connector_name"}
+            parent (QObject, optional): parent widget. Defaults to None.
+        """
+        super(ConnectorListModel, self).__init__(parent)
+        self.setStringList(data)
+
+    def setStringList(self, data):
+        """Update the model with the data.
+
+        Args:
+            data (dict): Dict containing {"name": "connector_title", "connector": "connector_name"}
+        """
+
+        self._data = data
+
+        connector_names = [d["name"] for d in data]
+        super(ConnectorListModel, self).setStringList(connector_names)
+
+    def data(self, index, role=QtCore.Qt.DisplayRole):
+        """Extend the data method to return the Connector node.
+
+        Args:
+            index (PySide2.QtCore.QModelIndex): Index of requested data.
+            role (int, optional): Requested data role. Defaults to QtCore.Qt.DisplayRole.
+
+        Returns:
+            Any
+        """
+
+        if not self._data:
+            return super(ConnectorListModel, self).data(index, role)
+
+        if role == self.ConnectorRole:
+            return self._data[index.row()]["connector"]
+
+        return super(ConnectorListModel, self).data(index, role)
+
+    def roleNames(self):
+        roles = super(ConnectorListModel, self).roleNames()
+        roles[self.ConnectorRole] = b"connector"
+        return roles
+
+
+class ConnectorAbstractView(QtGuiWidgets.QListView):
+    """Extend the QListView to emit a signal when the current index changes."""
+
+    currentIndexChanged = QtCore.Signal()
+
+    def currentChanged(self, current, previous):
+        ret = super(ConnectorAbstractView, self).currentChanged(current, previous)
+        self.currentIndexChanged.emit()
+        return ret
+
+
 class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
     """Custom QLineEdit with combined auto completion."""
 
@@ -226,13 +289,16 @@ class LineEditConnectSelection(QtGuiWidgets.QLineEdit):
 
         self.itemDelegate = QtGuiWidgets.QStyledItemDelegate(self)
 
-        self.listWidget = QtGuiWidgets.QListView(parent)
-        self.listWidget.hide()
-        self.model = QtCore.QStringListModel(self.filteredDotNameList)
-        self.listWidget.setModel(self.model)
+        # self.listWidget = ConnectorAbstractView(parent)
+        # self.listWidget.hide()
+        # self.model = ConnectorListModel(self.filteredDotNameList)
+        # self.listWidget.setModel(self.model)
 
         self.completer = QtGuiWidgets.QCompleter(self.filteredDotNameList, self)
         self.completer.setCompletionMode(QtGuiWidgets.QCompleter.UnfilteredPopupCompletion)
+
+        self.completer.setPopup(ConnectorAbstractView())
+        self.completer.setModel(ConnectorListModel(self.filteredDotNameList))
 
         self.completer.popup().setMouseTracking(True)
         self.completer.popup().setStyleSheet("QAbstractItemView:item:hover{background-color:#484848;}")
@@ -427,6 +493,7 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 self.input.textChanged.connect(self.highlightButtonsMatchingResults)
                 self.input.returnPressed.connect(self.lineEnter)
                 self.input.completer.popup().pressed.connect(self.lineEnter)
+                self.input.completer.popup().currentIndexChanged.connect(self.highlightButtonsMatchingResults)
 
                 self.hasInputField = True
                 button_grid.addWidget(
@@ -518,15 +585,15 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 if fnmatch.fnmatch(button.text(), query):
                     self.highlightButtons.append(button)
                     if button.text() not in tempListUnsorted:
-                        tempListUnsorted.append(button.text())
+                        tempListUnsorted.append({"name": button.label, "connector": button.connector.name()})
 
             for n in list(tempListUnsorted):
-                if n.startswith(inputText):
+                if n["name"].startswith(inputText):
                     self.input.filteredDotNameList.append(n)
                     tempListUnsorted.remove(n)
 
             for n in list(tempListUnsorted):
-                if inputText in n:
+                if inputText in n["name"]:
                     self.input.filteredDotNameList.append(n)
                     tempListUnsorted.remove(n)
 
@@ -543,8 +610,15 @@ class LabelConnector(QtGuiWidgets.QWidget):
             button.setStyleDefault()
 
         if inputText:
+            selected_entry = self.input.completer.popup().currentIndex()
+
+            if selected_entry.row() != -1:
+                connector_name = self.input.completer.model().data(selected_entry, QtCore.Qt.UserRole + 1)
+            else:
+                connector_name = ""
+
             for button in self.highlightButtons:
-                if inputText == button.text():
+                if connector_name == button.connector.name() and button.label == inputText:
                     button.setStyleHighlighted()
                     return
 
@@ -830,28 +904,40 @@ class LabelConnector(QtGuiWidgets.QWidget):
                 self.close()
                 return
 
-            connectDot = ""
+            else:
+                input_text = self.input.text().upper()
 
-            for dot in self.connectors:
-                if self.input.text().upper() == dot.knob("label").getValue().upper():
-                    connectDot = dot
-                    break
+            selected_entry = self.input.completer.popup().currentIndex()
+            connect_to = ""
 
-            if not connectDot and self.input.filteredDotNameList:
-                for dot in self.connectors:
-                    if self.input.filteredDotNameList[0] == dot.knob("label").getValue().upper():
-                        connectDot = dot
+            if selected_entry.row() != -1:
+                connector_name = self.input.completer.model().data(selected_entry, QtCore.Qt.UserRole + 1)
+                for connector in self.connectors:
+                    if connector_name == connector.name():
+                        connect_to = connector
+                        break
+            else:
+                for connector in self.connectors:
+                    if input_text == connector.knob("label").getValue().upper():
+                        connect_to = connector
                         break
 
-            if connectDot:
+            if not connect_to and self.input.filteredDotNameList:
+                name_list = [d["name"] for d in self.input.filteredDotNameList]
+                for connector in self.connectors:
+                    if name_list[0].upper() == connector.knob("label").getValue().upper():
+                        connect_to = connector
+                        break
+
+            if connect_to:
                 keyModifier = QtGuiWidgets.QApplication.keyboardModifiers()
 
                 if keyModifier == QtCore.Qt.ControlModifier:
-                    jumpKeepingPreviousSelection(connectDot)
+                    jumpKeepingPreviousSelection(connect_to)
 
                 else:
                     UNDO.begin(UNDO_EVENT_TEXT)
-                    createConnectingNodeAndConnect(connectDot, self.node)
+                    createConnectingNodeAndConnect(connect_to, self.node)
                     UNDO.end()
 
         self.close()
