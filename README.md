@@ -1,14 +1,14 @@
 # Label Connector
-A Connector Tool for Nuke with a handy UI. Super light-weight and very easy to use, just one single shortcut to create, setup, colorize and navigate these connections from anywhere in the Node Graph. No Callbacks, no hidden knobs created, to always stay compatible to other pipelines, or artists not having the Label Connector.
+A Connector Tool for Nuke with a handy UI. Super light-weight and very easy to use, just one single shortcut to create, setup, colorize and navigate these connections from anywhere in the Node Graph. No Callbacks, no external code references on nodes, to always stay compatible to other pipelines, or artists not having the Label Connector.
 
 Demo Video:
 https://youtu.be/KIwTWMKP2u0
 
 ![LabelConnector](./.pictures/LabelConnectorMain.png)
 
-## Stamps
+## Whats different to Stamps?
 
-There is a  big difference to Stamps, that this oen here doesn't use any callbacks and is none-intrusive, leaving no reffered code on Nodes that will cause issues in other pipelines or with other artists. There is a version of this UI compatible with Stamps, if you use Stamps in your pipeline here: [LabelConnector for Stamps](https://github.com/luckyspacetraveller/Stamps)
+The big difference to Stamps is, that this one here doesn't use any callbacks and is kind of non-intrusive, no code on Nodes that might cause issues in other pipelines or with other artists. There is a version of this UI compatible with Stamps (plus some more upgrades), if you use Stamps in your pipeline already -> [LabelConnector for Stamps](https://github.com/luckyspacetraveller/Stamps).
 
 
 ## Quick Manual
